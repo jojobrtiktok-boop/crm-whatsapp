@@ -26,6 +26,8 @@ router.post('/evolution', async (req, res) => {
     // Verificar tipo de evento
     if (evento.event === 'messages.upsert' || evento.data?.message) {
       await processarMensagem(evento, instancia);
+    } else if (evento.event === 'messages.update') {
+      await processarRecibo(evento);
     } else if (evento.event === 'connection.update') {
       await processarConexao(evento, instancia);
     }
@@ -232,6 +234,33 @@ async function processarPDF(evento, instancia, cliente, chip, mensagem) {
     }
   } catch (err) {
     console.error('[Webhook] Erro ao processar PDF:', err.message);
+  }
+}
+
+// Processa recibos de leitura do WhatsApp (✓✓ entregue / ✓✓ azul lido)
+async function processarRecibo(evento) {
+  try {
+    const updates = Array.isArray(evento.data) ? evento.data : [evento.data];
+    for (const upd of updates) {
+      const wamid = upd?.key?.id || upd?.id;
+      const status = upd?.update?.status || upd?.status;
+      if (!wamid || !status) continue;
+
+      let novoStatus = null;
+      if (status === 'DELIVERY_ACK') novoStatus = 'entregue';
+      else if (status === 'READ' || status === 'PLAYED') novoStatus = 'lido';
+
+      if (novoStatus) {
+        const conversa = await prisma.conversa.findFirst({ where: { wamid } });
+        if (conversa) {
+          await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
+          emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
+          console.log(`[Webhook] Recibo: msg ${wamid} → ${novoStatus}`);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Webhook] Erro ao processar recibo:', err.message);
   }
 }
 

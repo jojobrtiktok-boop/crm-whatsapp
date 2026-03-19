@@ -107,6 +107,19 @@ async function gerarPairingCode(instancia, telefone) {
   return response.data;
 }
 
+// Enviar documento/PDF
+async function enviarDocumento(instancia, telefone, documentoUrl, nomeArquivo = 'documento.pdf') {
+  const response = await api.post(`/message/sendMedia/${instancia}`, {
+    number: telefone,
+    mediaMessage: {
+      mediatype: 'document',
+      media: documentoUrl,
+      fileName: nomeArquivo,
+    },
+  });
+  return response.data;
+}
+
 // Deletar instancia
 async function deletarInstancia(instancia) {
   if (!instancia) return;
@@ -121,6 +134,7 @@ async function configurarWebhook(instancia, webhookUrl) {
     webhook_by_events: false,
     events: [
       'MESSAGES_UPSERT',
+      'MESSAGES_UPDATE',
       'CONNECTION_UPDATE',
     ],
   });
@@ -152,6 +166,7 @@ module.exports = {
   enviarImagem,
   enviarAudio,
   enviarVideo,
+  enviarDocumento,
   enviarBotoes,
   verificarStatus,
   criarInstancia,

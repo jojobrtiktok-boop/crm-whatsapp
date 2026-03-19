@@ -1,13 +1,13 @@
 // Processador da fila de envio de mensagens
 const { mensagemQueue } = require('./setup');
-const { enviarTexto, enviarImagem, enviarAudio, enviarVideo } = require('../services/evolutionApi');
+const { enviarTexto, enviarImagem, enviarAudio, enviarVideo, enviarDocumento } = require('../services/evolutionApi');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
 
 // Processa cada job de envio de mensagem
 mensagemQueue.process(async (job) => {
-  const { tipo, instancia, telefone, mensagem, url, legenda, execucaoId } = job.data;
+  const { tipo, instancia, telefone, mensagem, url, legenda, nomeArquivo, execucaoId, conversaId } = job.data;
 
   // Jobs de delay (apenas disparam continuação do funil)
   if (tipo === 'delay') {
@@ -23,28 +23,54 @@ mensagemQueue.process(async (job) => {
     return;
   }
 
+  // @lid é formato privado do WhatsApp - Evolution API v1.x não consegue enviar
+  if (telefone && telefone.includes('@lid')) {
+    console.log(`[MensagemQueue] Ignorando @lid (formato privado): ${telefone}`);
+    return;
+  }
+
   console.log(`[MensagemQueue] Enviando ${tipo} para ${telefone} via ${instancia}`);
+
+  let resultado = null;
 
   switch (tipo) {
     case 'texto':
-      await enviarTexto(instancia, telefone, mensagem);
+      resultado = await enviarTexto(instancia, telefone, mensagem);
       break;
     case 'imagem':
-      await enviarImagem(instancia, telefone, url, legenda);
+      resultado = await enviarImagem(instancia, telefone, url, legenda);
       break;
     case 'audio':
-      await enviarAudio(instancia, telefone, url);
+      resultado = await enviarAudio(instancia, telefone, url);
       break;
     case 'video':
-      await enviarVideo(instancia, telefone, url, legenda);
+      resultado = await enviarVideo(instancia, telefone, url, legenda);
+      break;
+    case 'documento':
+      resultado = await enviarDocumento(instancia, telefone, url, nomeArquivo);
       break;
     default:
       console.log(`[MensagemQueue] Tipo desconhecido: ${tipo}`);
+  }
+
+  // Salvar wamid para rastrear recibos de leitura
+  if (resultado && conversaId) {
+    const wamid = resultado?.key?.id || resultado?.id;
+    if (wamid) {
+      await prisma.conversa.update({
+        where: { id: conversaId },
+        data: { wamid },
+      });
+    }
   }
 });
 
 mensagemQueue.on('completed', (job) => {
   console.log(`[MensagemQueue] Job ${job.id} concluído`);
+});
+
+mensagemQueue.on('failed', (job, err) => {
+  console.error(`[MensagemQueue] Job ${job.id} falhou:`, err.message);
 });
 
 module.exports = mensagemQueue;

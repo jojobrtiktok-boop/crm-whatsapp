@@ -1,7 +1,54 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, User, GitBranch, Play, Smartphone, Bot, HeadphonesIcon } from 'lucide-react';
+import { Send, User, GitBranch, Play, Smartphone, Bot, HeadphonesIcon, Paperclip, Check, CheckCheck, FileText, Image, Video, X } from 'lucide-react';
 import api from '../api';
 import { useSocket, useSocketEvent } from '../hooks/useSocket';
+
+// Ícone de ticks de leitura WhatsApp
+function Ticks({ status }) {
+  if (status === 'lido') {
+    return <CheckCheck size={14} className="text-blue-300 shrink-0" />;
+  }
+  if (status === 'entregue') {
+    return <CheckCheck size={14} className="text-primary-200 shrink-0" />;
+  }
+  // enviado (padrão)
+  return <Check size={14} className="text-primary-200 shrink-0" />;
+}
+
+// Preview de mídia na bolha de mensagem
+function MidiaBubble({ msg }) {
+  if (!msg.tipoMidia) return <p className="whitespace-pre-wrap">{msg.conteudo}</p>;
+
+  const url = msg.midiaUrl ? (msg.midiaUrl.startsWith('http') ? msg.midiaUrl : `${window.location.origin.replace(':5173', ':3001')}${msg.midiaUrl}`) : null;
+
+  if (msg.tipoMidia === 'imagem' && url) {
+    return (
+      <div>
+        <a href={url} target="_blank" rel="noreferrer">
+          <img src={url} alt="imagem" className="rounded max-w-[200px] mb-1" />
+        </a>
+        {msg.conteudo && <p className="text-xs mt-1">{msg.conteudo}</p>}
+      </div>
+    );
+  }
+  if (msg.tipoMidia === 'video' && url) {
+    return (
+      <div>
+        <video src={url} controls className="rounded max-w-[200px] mb-1" />
+        {msg.conteudo && <p className="text-xs mt-1">{msg.conteudo}</p>}
+      </div>
+    );
+  }
+  if (msg.tipoMidia === 'documento' && url) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 underline">
+        <FileText size={16} />
+        <span className="text-sm">{msg.conteudo || 'documento.pdf'}</span>
+      </a>
+    );
+  }
+  return <p className="italic opacity-75">[{msg.tipoMidia}]</p>;
+}
 
 export default function Atendimento() {
   const [leads, setLeads] = useState([]);
@@ -12,7 +59,10 @@ export default function Atendimento() {
   const [funis, setFunis] = useState([]);
   const [modalFunil, setModalFunil] = useState(false);
   const [fotos, setFotos] = useState({});
+  const [enviando, setEnviando] = useState(false);
+  const [previewArquivo, setPreviewArquivo] = useState(null); // { file, tipo, url }
   const chatRef = useRef(null);
+  const fileInputRef = useRef(null);
   const socket = useSocket();
 
   async function carregarLeads() {
@@ -25,7 +75,6 @@ export default function Atendimento() {
       setLeads(resLeads.data);
       setChips(resChips.data);
       setFunis(resFunis.data);
-      // Buscar fotos em background (sem bloquear)
       resLeads.data.forEach((lead) => {
         api.get(`/clientes/${lead.id}/foto`).then((r) => {
           if (r.data?.url) setFotos((prev) => ({ ...prev, [lead.id]: r.data.url }));
@@ -38,22 +87,28 @@ export default function Atendimento() {
 
   useEffect(() => { carregarLeads(); }, []);
 
-  // Novo lead/atendimento em tempo real
   const handleNovoAtendimento = useCallback(() => { carregarLeads(); }, []);
   useSocketEvent('atendimento:novo', handleNovoAtendimento);
   useSocketEvent('lead:novo', handleNovoAtendimento);
 
-  // Nova mensagem em tempo real
   const handleNovaMensagem = useCallback((data) => {
-    // Atualizar lista (ultima mensagem)
     carregarLeads();
-    // Se for do lead selecionado, adicionar ao chat
     if (selecionado && data.clienteId === selecionado.id) {
       setConversas((prev) => [...prev, data.conversa]);
       scrollParaBaixo();
     }
   }, [selecionado]);
   useSocketEvent('mensagem:nova', handleNovaMensagem);
+
+  // Atualizar status de leitura em tempo real
+  const handleMensagemStatus = useCallback((data) => {
+    if (selecionado && data.clienteId === selecionado.id) {
+      setConversas((prev) =>
+        prev.map((c) => c.id === data.conversaId ? { ...c, status: data.status } : c)
+      );
+    }
+  }, [selecionado]);
+  useSocketEvent('mensagem:status', handleMensagemStatus);
 
   async function selecionarLead(lead) {
     setSelecionado(lead);
@@ -70,20 +125,60 @@ export default function Atendimento() {
   }
 
   async function enviarMensagem() {
-    if (!mensagem.trim() || !selecionado) return;
+    if (!mensagem.trim() || !selecionado || enviando) return;
     const chipId = selecionado.chipOrigem?.id || selecionado.chipOrigemId || chips[0]?.id;
+    setEnviando(true);
     try {
-      await api.post('/whatsapp/enviar', {
+      const res = await api.post('/whatsapp/enviar', {
         clienteId: selecionado.id,
         chipId,
         mensagem: mensagem.trim(),
       });
       setMensagem('');
-      const res = await api.get(`/clientes/${selecionado.id}/conversas`);
-      setConversas(res.data);
+      setConversas((prev) => [...prev, res.data.conversa]);
       scrollParaBaixo();
+      carregarLeads();
     } catch (err) {
       console.error('Erro ao enviar:', err);
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  function onArquivoSelecionado(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    const tipo = ext === 'pdf' ? 'documento' : /mp4|avi|mov/.test(ext) ? 'video' : 'imagem';
+    const url = URL.createObjectURL(file);
+    setPreviewArquivo({ file, tipo, url });
+  }
+
+  async function enviarArquivo() {
+    if (!previewArquivo || !selecionado || enviando) return;
+    const chipId = selecionado.chipOrigem?.id || selecionado.chipOrigemId || chips[0]?.id;
+    setEnviando(true);
+    try {
+      const formData = new FormData();
+      formData.append('arquivo', previewArquivo.file);
+      formData.append('clienteId', selecionado.id);
+      formData.append('chipId', chipId);
+
+      const res = await api.post('/whatsapp/enviar-arquivo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+
+      setConversas((prev) => [...prev, res.data.conversa]);
+      scrollParaBaixo();
+      carregarLeads();
+      setPreviewArquivo(null);
+      fileInputRef.current.value = '';
+    } catch (err) {
+      console.error('Erro ao enviar arquivo:', err);
+      alert('Erro ao enviar arquivo');
+    } finally {
+      setEnviando(false);
     }
   }
 
@@ -191,18 +286,18 @@ export default function Atendimento() {
                   : <User size={16} className="text-gray-500" />
                 }
               </div>
-            <div>
-              <h3 className="font-semibold text-gray-800">{selecionado.nome || 'Sem nome'}</h3>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">{selecionado.telefone}</p>
-                {selecionado.chipOrigem && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md">
-                    <Smartphone size={10} />
-                    {selecionado.chipOrigem.nome || selecionado.chipOrigem.numero?.slice(-4)}
-                  </span>
-                )}
+              <div>
+                <h3 className="font-semibold text-gray-800">{selecionado.nome || 'Sem nome'}</h3>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-gray-500">{selecionado.telefone}</p>
+                  {selecionado.chipOrigem && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md">
+                      <Smartphone size={10} />
+                      {selecionado.chipOrigem.nome || selecionado.chipOrigem.numero?.slice(-4)}
+                    </span>
+                  )}
+                </div>
               </div>
-            </div>
             </div>
             <button
               onClick={() => setModalFunil(true)}
@@ -226,8 +321,8 @@ export default function Atendimento() {
                       : 'bg-white border border-gray-200 text-gray-800'
                   }`}
                 >
-                  <p>{msg.conteudo || `[${msg.tipoMidia}]`}</p>
-                  <div className={`flex items-center gap-1.5 mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
+                  <MidiaBubble msg={msg} />
+                  <div className={`flex items-center justify-end gap-1 mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
                     <span className="text-xs">{formatarHora(msg.criadoEm)}</span>
                     {msg.tipo === 'recebida' && msg.chipId && (
                       <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 text-[9px] font-semibold rounded">
@@ -235,27 +330,77 @@ export default function Atendimento() {
                         {getNomeChip(msg.chipId)}
                       </span>
                     )}
+                    {msg.tipo === 'enviada' && <Ticks status={msg.status} />}
                   </div>
                 </div>
               </div>
             ))}
           </div>
 
+          {/* Preview de arquivo para enviar */}
+          {previewArquivo && (
+            <div className="px-4 py-2 border-t border-gray-100 bg-white flex items-center gap-3">
+              {previewArquivo.tipo === 'imagem' && (
+                <img src={previewArquivo.url} alt="" className="h-16 w-16 object-cover rounded" />
+              )}
+              {previewArquivo.tipo === 'video' && (
+                <video src={previewArquivo.url} className="h-16 w-16 object-cover rounded" />
+              )}
+              {previewArquivo.tipo === 'documento' && (
+                <div className="flex items-center gap-2 text-gray-700">
+                  <FileText size={32} />
+                  <span className="text-sm truncate max-w-[200px]">{previewArquivo.file.name}</span>
+                </div>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={enviarArquivo}
+                disabled={enviando}
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+              >
+                {enviando ? 'Enviando...' : 'Enviar'}
+              </button>
+              <button
+                onClick={() => { setPreviewArquivo(null); fileInputRef.current.value = ''; }}
+                className="p-2 text-gray-400 hover:text-gray-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          )}
+
           {/* Input */}
           <div className="p-4 border-t border-gray-200">
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* Botão de anexo */}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/mp4,video/avi,video/mov,.pdf"
+                className="hidden"
+                onChange={onArquivoSelecionado}
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                title="Enviar arquivo (imagem, vídeo, PDF)"
+              >
+                <Paperclip size={20} />
+              </button>
+
               <input
                 type="text"
                 value={mensagem}
                 onChange={(e) => setMensagem(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && enviarMensagem()}
+                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && enviarMensagem()}
                 className="flex-1 rounded-lg border-gray-300 text-sm"
                 placeholder="Digite sua mensagem..."
+                disabled={enviando}
               />
               <button
                 onClick={enviarMensagem}
-                disabled={!mensagem.trim()}
-                className="bg-primary-600 text-white px-4 rounded-lg hover:bg-primary-700 disabled:opacity-50"
+                disabled={!mensagem.trim() || enviando}
+                className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50"
               >
                 <Send size={18} />
               </button>
