@@ -10,6 +10,10 @@ const config = require('./config');
 const { errorHandler } = require('./middleware/errorHandler');
 const { inicializarSocketManager } = require('./services/socketManager');
 
+// Registrar processadores das filas
+require('./queues/mensagemQueue');
+require('./queues/comprovanteQueue');
+
 const app = express();
 const server = http.createServer(app);
 
