@@ -32,11 +32,27 @@ async function enviarTexto(instancia, telefone, mensagem) {
   return response.data;
 }
 
+// Constrói objeto file para WAHA: base64 se localPath fornecido, senão URL
+const fs = require('fs');
+const path = require('path');
+const mime = require('mime-types');
+
+function buildFileObj(urlOrPath, nomeArquivo) {
+  if (urlOrPath && !urlOrPath.startsWith('http')) {
+    // Arquivo local: enviar como base64
+    const data = fs.readFileSync(urlOrPath).toString('base64');
+    const mimetype = mime.lookup(urlOrPath) || 'application/octet-stream';
+    const filename = nomeArquivo || path.basename(urlOrPath);
+    return { data, mimetype, filename };
+  }
+  return { url: urlOrPath };
+}
+
 // Enviar imagem
 async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
   const response = await api.post('/api/sendImage', {
     chatId: formatChatId(telefone),
-    file: { url: imagemUrl },
+    file: buildFileObj(imagemUrl),
     caption: legenda,
     session: instancia,
   });
@@ -47,7 +63,7 @@ async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
 async function enviarAudio(instancia, telefone, audioUrl) {
   const response = await api.post('/api/sendVoice', {
     chatId: formatChatId(telefone),
-    file: { url: audioUrl },
+    file: buildFileObj(audioUrl),
     session: instancia,
   });
   return response.data;
@@ -57,7 +73,7 @@ async function enviarAudio(instancia, telefone, audioUrl) {
 async function enviarVideo(instancia, telefone, videoUrl, legenda = '') {
   const response = await api.post('/api/sendVideo', {
     chatId: formatChatId(telefone),
-    file: { url: videoUrl },
+    file: buildFileObj(videoUrl),
     caption: legenda,
     session: instancia,
   });
@@ -68,7 +84,7 @@ async function enviarVideo(instancia, telefone, videoUrl, legenda = '') {
 async function enviarDocumento(instancia, telefone, docUrl, nomeArquivo = 'documento.pdf') {
   const response = await api.post('/api/sendFile', {
     chatId: formatChatId(telefone),
-    file: { url: docUrl, name: nomeArquivo },
+    file: buildFileObj(docUrl, nomeArquivo),
     session: instancia,
   });
   return response.data;

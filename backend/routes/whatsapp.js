@@ -103,10 +103,8 @@ router.post('/enviar-arquivo', upload.single('arquivo'), async (req, res, next) 
     const isVideo = /\.(mp4|avi|mov)$/.test(ext);
     const tipoMidia = isPDF ? 'documento' : isVideo ? 'video' : 'imagem';
 
-    // URL acessível pelo WAHA (Docker usa 172.17.0.1 para acessar o host)
-    const config = require('../config');
-    const wahaBase = process.env.WAHA_FILE_BASE_URL || `http://172.17.0.1:${process.env.PORT || 3001}`;
-    const fileUrl = `${wahaBase}/uploads/atendimento/${req.file.filename}`;
+    // Caminho local do arquivo (enviado como base64 para o WAHA)
+    const fileUrl = req.file.path;
 
     // Salvar conversa
     const conversa = await prisma.conversa.create({
