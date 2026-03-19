@@ -75,24 +75,29 @@ async function processarMensagemWaha(payload, instancia) {
     return;
   }
 
-  // Buscar ou criar cliente
+  // Buscar ou criar cliente (upsert evita race condition com unique constraint)
+  const nome = payload.notifyName || payload._data?.notifyName || null;
+  let isNovo = false;
   let cliente = await prisma.cliente.findUnique({ where: { telefone } });
   if (!cliente) {
-    cliente = await prisma.cliente.create({
-      data: {
-        telefone,
-        nome: payload.notifyName || payload._data?.notifyName || null,
-        chipOrigemId: chip.id,
-        status: 'novo',
-      },
-    });
-    console.log(`[Webhook] Novo lead: ${telefone} (${cliente.nome || 'sem nome'})`);
-    emitir('lead:novo', cliente);
-  } else if ((payload.notifyName || payload._data?.notifyName) && !cliente.nome) {
+    try {
+      cliente = await prisma.cliente.create({
+        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo' },
+      });
+      isNovo = true;
+    } catch {
+      cliente = await prisma.cliente.findUnique({ where: { telefone } });
+    }
+  } else if (nome && !cliente.nome) {
     cliente = await prisma.cliente.update({
       where: { id: cliente.id },
-      data: { nome: payload.notifyName || payload._data?.notifyName },
+      data: { nome },
     });
+  }
+  if (!cliente) return;
+  if (isNovo) {
+    console.log(`[Webhook] Novo lead: ${telefone} (${cliente.nome || 'sem nome'})`);
+    emitir('lead:novo', cliente);
   }
 
   // Extrair conteúdo
@@ -207,23 +212,25 @@ async function processarMensagem(evento, instancia) {
   const chip = await buscarChipPorInstancia(instancia);
   if (!chip) return;
 
+  let isNovo2 = false;
   let cliente = await prisma.cliente.findUnique({ where: { telefone } });
   if (!cliente) {
-    cliente = await prisma.cliente.create({
-      data: {
-        telefone,
-        nome: mensagem.pushName || null,
-        chipOrigemId: chip.id,
-        status: 'novo',
-      },
-    });
-    emitir('lead:novo', cliente);
+    try {
+      cliente = await prisma.cliente.create({
+        data: { telefone, nome: mensagem.pushName || null, chipOrigemId: chip.id, status: 'novo' },
+      });
+      isNovo2 = true;
+    } catch {
+      cliente = await prisma.cliente.findUnique({ where: { telefone } });
+    }
   } else if (mensagem.pushName && !cliente.nome) {
     cliente = await prisma.cliente.update({
       where: { id: cliente.id },
       data: { nome: mensagem.pushName },
     });
   }
+  if (!cliente) return;
+  if (isNovo2) emitir('lead:novo', cliente);
 
   const msgData = mensagem.message || {};
   let conteudo = msgData.conversation
