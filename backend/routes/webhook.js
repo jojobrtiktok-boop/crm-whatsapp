@@ -75,29 +75,29 @@ async function processarMensagemWaha(payload, instancia) {
 
   if (!telefone || telefone.includes('status')) return;
 
-  // Verificar blacklist
-  const bloqueado = await prisma.blacklist.findUnique({ where: { telefone } });
-  if (bloqueado) return;
-
-  // Buscar chip
+  // Buscar chip primeiro (precisamos do contaId)
   const chip = await buscarChipPorInstancia(instancia);
   if (!chip) {
     console.log(`[Webhook] Chip não encontrado para sessão: ${instancia}`);
     return;
   }
 
+  // Verificar blacklist (scoped por conta)
+  const bloqueado = await prisma.blacklist.findFirst({ where: { telefone, contaId: chip.contaId } });
+  if (bloqueado) return;
+
   // Buscar ou criar cliente (upsert evita race condition com unique constraint)
   const nome = payload.notifyName || payload._data?.notifyName || null;
   let isNovo = false;
-  let cliente = await prisma.cliente.findUnique({ where: { telefone } });
+  let cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
   if (!cliente) {
     try {
       cliente = await prisma.cliente.create({
-        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo' },
+        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo', contaId: chip.contaId },
       });
       isNovo = true;
     } catch {
-      cliente = await prisma.cliente.findUnique({ where: { telefone } });
+      cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
     }
   } else if (nome && !cliente.nome) {
     cliente = await prisma.cliente.update({
@@ -167,7 +167,7 @@ async function processarMensagemWaha(payload, instancia) {
   });
 
   if (!execucaoAtiva && cliente.status === 'novo') {
-    await iniciarFunil(cliente.id, chip.id);
+    await iniciarFunil(cliente.id, chip.id, chip.contaId);
   }
 }
 
@@ -234,22 +234,22 @@ async function processarMensagem(evento, instancia) {
     : remoteJid;
   if (!telefone || telefone.includes('status')) return;
 
-  const bloqueado = await prisma.blacklist.findUnique({ where: { telefone } });
-  if (bloqueado) return;
-
   const chip = await buscarChipPorInstancia(instancia);
   if (!chip) return;
 
+  const bloqueado = await prisma.blacklist.findFirst({ where: { telefone, contaId: chip.contaId } });
+  if (bloqueado) return;
+
   let isNovo2 = false;
-  let cliente = await prisma.cliente.findUnique({ where: { telefone } });
+  let cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
   if (!cliente) {
     try {
       cliente = await prisma.cliente.create({
-        data: { telefone, nome: mensagem.pushName || null, chipOrigemId: chip.id, status: 'novo' },
+        data: { telefone, nome: mensagem.pushName || null, chipOrigemId: chip.id, status: 'novo', contaId: chip.contaId },
       });
       isNovo2 = true;
     } catch {
-      cliente = await prisma.cliente.findUnique({ where: { telefone } });
+      cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
     }
   } else if (mensagem.pushName && !cliente.nome) {
     cliente = await prisma.cliente.update({
@@ -286,7 +286,7 @@ async function processarMensagem(evento, instancia) {
   });
 
   if (!execucaoAtiva && cliente.status === 'novo') {
-    await iniciarFunil(cliente.id, chip.id);
+    await iniciarFunil(cliente.id, chip.id, chip.contaId);
   }
 }
 
@@ -344,29 +344,29 @@ async function processarMensagemWPP(data, instancia) {
 
   if (!telefone) return;
 
-  // Verificar blacklist
-  const bloqueado = await prisma.blacklist.findUnique({ where: { telefone } });
-  if (bloqueado) return;
-
-  // Buscar chip
+  // Buscar chip primeiro (precisamos do contaId)
   const chip = await buscarChipPorInstancia(instancia);
   if (!chip) {
     console.log(`[Webhook] Chip não encontrado para sessão: ${instancia}`);
     return;
   }
 
+  // Verificar blacklist (scoped por conta)
+  const bloqueado = await prisma.blacklist.findFirst({ where: { telefone, contaId: chip.contaId } });
+  if (bloqueado) return;
+
   // Buscar ou criar cliente
   const nome = data.notifyName || data.chat?.contact?.name || null;
   let isNovo = false;
-  let cliente = await prisma.cliente.findUnique({ where: { telefone } });
+  let cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
   if (!cliente) {
     try {
       cliente = await prisma.cliente.create({
-        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo' },
+        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo', contaId: chip.contaId },
       });
       isNovo = true;
     } catch {
-      cliente = await prisma.cliente.findUnique({ where: { telefone } });
+      cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
     }
   } else if (nome && !cliente.nome) {
     cliente = await prisma.cliente.update({ where: { id: cliente.id }, data: { nome } });
@@ -434,7 +434,7 @@ async function processarMensagemWPP(data, instancia) {
     where: { clienteId: cliente.id, status: 'ativo' },
   });
   if (!execucaoAtiva && cliente.status === 'novo') {
-    await iniciarFunil(cliente.id, chip.id);
+    await iniciarFunil(cliente.id, chip.id, chip.contaId);
   }
 }
 

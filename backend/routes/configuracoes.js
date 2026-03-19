@@ -10,7 +10,7 @@ router.use(autenticar);
 // GET /api/configuracoes - Listar todas as configurações
 router.get('/', async (req, res, next) => {
   try {
-    const configs = await prisma.configuracao.findMany();
+    const configs = await prisma.configuracao.findMany({ where: { contaId: req.usuario.contaId } });
     // Transformar em objeto chave-valor
     const resultado = {};
     configs.forEach((c) => { resultado[c.chave] = c.valor; });
@@ -25,11 +25,12 @@ router.put('/', apenasAdmin, async (req, res, next) => {
   try {
     const configs = req.body;
 
+    const contaId = req.usuario.contaId;
     for (const [chave, valor] of Object.entries(configs)) {
       await prisma.configuracao.upsert({
-        where: { chave },
+        where: { chave_contaId: { chave, contaId } },
         update: { valor: String(valor) },
-        create: { chave, valor: String(valor) },
+        create: { chave, contaId, valor: String(valor) },
       });
     }
 

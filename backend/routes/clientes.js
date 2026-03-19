@@ -13,7 +13,7 @@ router.get('/', async (req, res, next) => {
     const { status, chipId, tagId, busca, pagina = 1, limite = 50 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limite);
 
-    const where = {};
+    const where = { contaId: req.usuario.contaId };
     if (status) where.status = status;
     if (chipId) where.chipOrigemId = parseInt(chipId);
     if (busca) {
@@ -55,8 +55,8 @@ router.get('/', async (req, res, next) => {
 // GET /api/clientes/:id - Detalhe do cliente
 router.get('/:id', async (req, res, next) => {
   try {
-    const cliente = await prisma.cliente.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const cliente = await prisma.cliente.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
       include: {
         chipOrigem: { select: { id: true, nome: true } },
         tags: { include: { tag: true } },
@@ -91,6 +91,7 @@ router.post('/', async (req, res, next) => {
         telefone: telefone.replace(/\D/g, ''),
         chipOrigemId,
         status: status || 'novo',
+        contaId: req.usuario.contaId,
       },
       include: { chipOrigem: { select: { id: true, nome: true } } },
     });
@@ -109,8 +110,14 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { nome, status, telefone } = req.body;
+    const clienteId = parseInt(req.params.id);
+    // Verify ownership
+    const existe = await prisma.cliente.findFirst({ where: { id: clienteId, contaId: req.usuario.contaId } });
+    if (!existe) {
+      return res.status(404).json({ erro: 'Cliente não encontrado' });
+    }
     const cliente = await prisma.cliente.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: clienteId },
       data: { nome, status, telefone },
       include: {
         chipOrigem: { select: { id: true, nome: true } },
@@ -205,8 +212,8 @@ router.post('/:id/anotacoes', async (req, res, next) => {
 // GET /api/clientes/:id/foto - Buscar foto de perfil do WhatsApp
 router.get('/:id/foto', async (req, res, next) => {
   try {
-    const cliente = await prisma.cliente.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const cliente = await prisma.cliente.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
       include: { chipOrigem: { select: { instanciaEvolution: true } } },
     });
 

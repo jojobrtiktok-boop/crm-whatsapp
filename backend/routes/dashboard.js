@@ -19,8 +19,11 @@ router.get('/resumo', async (req, res, next) => {
 
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
 
-    const whereBase = {};
+    const whereBase = { chip: { contaId: req.usuario.contaId } };
     if (chipId) whereBase.chipId = parseInt(chipId);
+
+    const clienteWhereBase = { chipOrigem: { contaId: req.usuario.contaId } };
+    if (chipId) clienteWhereBase.chipOrigemId = parseInt(chipId);
 
     // Vendas confirmadas
     const [vendasDia, vendasSemana, vendasMes] = await Promise.all([
@@ -44,28 +47,28 @@ router.get('/resumo', async (req, res, next) => {
     // Leads do dia, semana e mês
     const [leadsDia, leadsSemana, leadsMes] = await Promise.all([
       prisma.cliente.count({
-        where: { ...(chipId ? { chipOrigemId: parseInt(chipId) } : {}), criadoEm: { gte: hoje } },
+        where: { ...clienteWhereBase, criadoEm: { gte: hoje } },
       }),
       prisma.cliente.count({
-        where: { ...(chipId ? { chipOrigemId: parseInt(chipId) } : {}), criadoEm: { gte: inicioSemana } },
+        where: { ...clienteWhereBase, criadoEm: { gte: inicioSemana } },
       }),
       prisma.cliente.count({
-        where: { ...(chipId ? { chipOrigemId: parseInt(chipId) } : {}), criadoEm: { gte: inicioMes } },
+        where: { ...clienteWhereBase, criadoEm: { gte: inicioMes } },
       }),
     ]);
 
     // Total geral
     const [totalClientes, totalVendas] = await Promise.all([
-      prisma.cliente.count(),
+      prisma.cliente.count({ where: { chipOrigem: { contaId: req.usuario.contaId } } }),
       prisma.venda.aggregate({
-        where: { status: 'confirmado' },
+        where: { status: 'confirmado', chip: { contaId: req.usuario.contaId } },
         _sum: { valor: true },
         _count: true,
       }),
     ]);
 
     // Taxa de conversão (leads que compraram / total de leads)
-    const leadCompraram = await prisma.cliente.count({ where: { status: 'comprou' } });
+    const leadCompraram = await prisma.cliente.count({ where: { status: 'comprou', chipOrigem: { contaId: req.usuario.contaId } } });
     const taxaConversao = totalClientes > 0 ? ((leadCompraram / totalClientes) * 100).toFixed(1) : 0;
 
     res.json({
@@ -114,7 +117,7 @@ router.get('/comparativo-chips', async (req, res, next) => {
     }
 
     const chips = await prisma.chip.findMany({
-      where: { ativo: true },
+      where: { ativo: true, contaId: req.usuario.contaId },
       select: { id: true, nome: true, numero: true },
     });
 
@@ -159,7 +162,7 @@ router.get('/chips-resumo', async (req, res, next) => {
     inicioSemana.setDate(hoje.getDate() - 6); // últimos 7 dias
 
     const chips = await prisma.chip.findMany({
-      where: { ativo: true },
+      where: { ativo: true, contaId: req.usuario.contaId },
       select: { id: true, nome: true, numero: true },
     });
 
@@ -199,6 +202,7 @@ router.get('/chips-resumo', async (req, res, next) => {
 router.get('/vendas-recentes', async (req, res, next) => {
   try {
     const vendas = await prisma.venda.findMany({
+      where: { chip: { contaId: req.usuario.contaId } },
       take: 20,
       orderBy: { criadoEm: 'desc' },
       include: {

@@ -32,7 +32,7 @@ router.post('/login', async (req, res, next) => {
     }
 
     const token = jwt.sign(
-      { id: usuario.id, nome: usuario.nome, email: usuario.email, role: usuario.role },
+      { id: usuario.id, nome: usuario.nome, email: usuario.email, role: usuario.role, contaId: usuario.contaId },
       config.jwtSecret,
       { expiresIn: '24h' }
     );
@@ -47,6 +47,7 @@ router.post('/login', async (req, res, next) => {
         pais: usuario.pais,
         moeda: usuario.moeda,
         idioma: usuario.idioma,
+        contaId: usuario.contaId,
       },
     });
   } catch (err) {
@@ -90,7 +91,7 @@ router.get('/me', autenticar, async (req, res, next) => {
   try {
     const usuario = await prisma.usuario.findUnique({
       where: { id: req.usuario.id },
-      select: { id: true, nome: true, email: true, role: true, pais: true, moeda: true, idioma: true, criadoEm: true },
+      select: { id: true, nome: true, email: true, role: true, pais: true, moeda: true, idioma: true, contaId: true, criadoEm: true },
     });
 
     if (!usuario) {

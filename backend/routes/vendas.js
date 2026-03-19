@@ -13,7 +13,7 @@ router.get('/', async (req, res, next) => {
     const { status, chipId, dataInicio, dataFim, valorMin, valorMax, pagina = 1, limite = 50 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limite);
 
-    const where = {};
+    const where = { chip: { contaId: req.usuario.contaId } };
     if (status) where.status = status;
     if (chipId) where.chipId = parseInt(chipId);
     if (dataInicio || dataFim) {
@@ -58,7 +58,7 @@ router.get('/exportar', async (req, res, next) => {
   try {
     const { status, chipId, dataInicio, dataFim } = req.query;
 
-    const where = {};
+    const where = { chip: { contaId: req.usuario.contaId } };
     if (status) where.status = status;
     if (chipId) where.chipId = parseInt(chipId);
     if (dataInicio || dataFim) {

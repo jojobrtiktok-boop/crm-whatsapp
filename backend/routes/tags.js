@@ -11,6 +11,7 @@ router.use(autenticar);
 router.get('/', async (req, res, next) => {
   try {
     const tags = await prisma.tag.findMany({
+      where: { contaId: req.usuario.contaId },
       include: { _count: { select: { clientes: true } } },
       orderBy: { nome: 'asc' },
     });
@@ -28,7 +29,7 @@ router.post('/', async (req, res, next) => {
       return res.status(400).json({ erro: 'Nome é obrigatório' });
     }
 
-    const tag = await prisma.tag.create({ data: { nome, cor } });
+    const tag = await prisma.tag.create({ data: { nome, cor, contaId: req.usuario.contaId } });
     res.status(201).json(tag);
   } catch (err) {
     next(err);
@@ -39,8 +40,13 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { nome, cor } = req.body;
+    const tagId = parseInt(req.params.id);
+    const existe = await prisma.tag.findFirst({ where: { id: tagId, contaId: req.usuario.contaId } });
+    if (!existe) {
+      return res.status(404).json({ erro: 'Tag não encontrada' });
+    }
     const tag = await prisma.tag.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: tagId },
       data: { nome, cor },
     });
     res.json(tag);
@@ -52,7 +58,12 @@ router.put('/:id', async (req, res, next) => {
 // DELETE /api/tags/:id - Deletar tag
 router.delete('/:id', async (req, res, next) => {
   try {
-    await prisma.tag.delete({ where: { id: parseInt(req.params.id) } });
+    const tagId = parseInt(req.params.id);
+    const existe = await prisma.tag.findFirst({ where: { id: tagId, contaId: req.usuario.contaId } });
+    if (!existe) {
+      return res.status(404).json({ erro: 'Tag não encontrada' });
+    }
+    await prisma.tag.delete({ where: { id: tagId } });
     res.json({ mensagem: 'Tag removida' });
   } catch (err) {
     next(err);

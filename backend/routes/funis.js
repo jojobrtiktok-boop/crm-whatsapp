@@ -11,6 +11,7 @@ router.use(autenticar);
 router.get('/', async (req, res, next) => {
   try {
     const funis = await prisma.funil.findMany({
+      where: { contaId: req.usuario.contaId },
       orderBy: { criadoEm: 'desc' },
       select: {
         id: true,
@@ -31,8 +32,8 @@ router.get('/', async (req, res, next) => {
 // GET /api/funis/:id - Detalhe do funil (com blocos e conexões)
 router.get('/:id', async (req, res, next) => {
   try {
-    const funil = await prisma.funil.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const funil = await prisma.funil.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!funil) {
@@ -60,6 +61,7 @@ router.post('/', async (req, res, next) => {
         descricao,
         blocos: blocos || [],
         conexoes: conexoes || [],
+        contaId: req.usuario.contaId,
       },
     });
 
@@ -73,8 +75,13 @@ router.post('/', async (req, res, next) => {
 router.put('/:id', async (req, res, next) => {
   try {
     const { nome, descricao, blocos, conexoes } = req.body;
+    const funilId = parseInt(req.params.id);
+    const existe = await prisma.funil.findFirst({ where: { id: funilId, contaId: req.usuario.contaId } });
+    if (!existe) {
+      return res.status(404).json({ erro: 'Funil não encontrado' });
+    }
     const funil = await prisma.funil.update({
-      where: { id: parseInt(req.params.id) },
+      where: { id: funilId },
       data: { nome, descricao, blocos, conexoes },
     });
     res.json(funil);
@@ -86,8 +93,8 @@ router.put('/:id', async (req, res, next) => {
 // PUT /api/funis/:id/toggle - Ativar/desativar funil
 router.put('/:id/toggle', async (req, res, next) => {
   try {
-    const funil = await prisma.funil.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const funil = await prisma.funil.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!funil) {
@@ -108,8 +115,8 @@ router.put('/:id/toggle', async (req, res, next) => {
 // POST /api/funis/:id/duplicar - Duplicar funil
 router.post('/:id/duplicar', async (req, res, next) => {
   try {
-    const original = await prisma.funil.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const original = await prisma.funil.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!original) {
@@ -123,6 +130,7 @@ router.post('/:id/duplicar', async (req, res, next) => {
         blocos: original.blocos,
         conexoes: original.conexoes,
         ativo: false,
+        contaId: req.usuario.contaId,
       },
     });
 
@@ -147,7 +155,7 @@ router.post('/executar', async (req, res, next) => {
     }
 
     const funilEngine = require('../services/funilEngine');
-    const execucao = await funilEngine.iniciarFunil(clienteId, chipId, funilId);
+    const execucao = await funilEngine.iniciarFunil(clienteId, chipId, req.usuario.contaId, funilId);
 
     res.status(201).json({ mensagem: 'Funil ativado', execucao });
   } catch (err) {
@@ -158,13 +166,19 @@ router.post('/executar', async (req, res, next) => {
 // DELETE /api/funis/:id - Deletar funil
 router.delete('/:id', async (req, res, next) => {
   try {
+    const funilId = parseInt(req.params.id);
+    const existe = await prisma.funil.findFirst({ where: { id: funilId, contaId: req.usuario.contaId } });
+    if (!existe) {
+      return res.status(404).json({ erro: 'Funil não encontrado' });
+    }
+
     // Primeiro remove execuções associadas
     await prisma.funilExecucao.deleteMany({
-      where: { funilId: parseInt(req.params.id) },
+      where: { funilId },
     });
 
     await prisma.funil.delete({
-      where: { id: parseInt(req.params.id) },
+      where: { id: funilId },
     });
 
     res.json({ mensagem: 'Funil removido' });

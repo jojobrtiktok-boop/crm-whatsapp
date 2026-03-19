@@ -14,7 +14,8 @@ router.use(apenasAdmin);
 router.get('/', async (req, res, next) => {
   try {
     const usuarios = await prisma.usuario.findMany({
-      select: { id: true, nome: true, email: true, role: true, ativo: true, pais: true, moeda: true, idioma: true, criadoEm: true },
+      where: { contaId: req.usuario.contaId },
+      select: { id: true, nome: true, email: true, role: true, ativo: true, pais: true, moeda: true, idioma: true, contaId: true, criadoEm: true },
       orderBy: { criadoEm: 'desc' },
     });
     res.json(usuarios);
@@ -34,15 +35,30 @@ router.post('/', async (req, res, next) => {
 
     const paisInfo = PAISES[pais] || PAISES['BR'];
     const senhaHash = await bcrypt.hash(senha, 10);
-    const usuario = await prisma.usuario.create({
-      data: {
-        nome, email, senha: senhaHash, role: role || 'operador',
-        pais: pais || 'BR',
-        moeda: paisInfo.moeda,
-        idioma: paisInfo.idioma,
-      },
-      select: { id: true, nome: true, email: true, role: true, pais: true, moeda: true, idioma: true, criadoEm: true },
+    const novoRole = role || 'operador';
+    const createData = {
+      nome, email, senha: senhaHash, role: novoRole,
+      pais: pais || 'BR',
+      moeda: paisInfo.moeda,
+      idioma: paisInfo.idioma,
+    };
+    if (novoRole !== 'admin') {
+      createData.contaId = req.usuario.contaId;
+    }
+
+    let usuario = await prisma.usuario.create({
+      data: createData,
+      select: { id: true, nome: true, email: true, role: true, pais: true, moeda: true, idioma: true, contaId: true, criadoEm: true },
     });
+
+    // Admin é sua própria conta
+    if (novoRole === 'admin') {
+      usuario = await prisma.usuario.update({
+        where: { id: usuario.id },
+        data: { contaId: usuario.id },
+        select: { id: true, nome: true, email: true, role: true, pais: true, moeda: true, idioma: true, contaId: true, criadoEm: true },
+      });
+    }
 
     res.status(201).json(usuario);
   } catch (err) {
@@ -69,7 +85,7 @@ router.put('/:id', async (req, res, next) => {
     const usuario = await prisma.usuario.update({
       where: { id: parseInt(req.params.id) },
       data,
-      select: { id: true, nome: true, email: true, role: true, ativo: true, pais: true, moeda: true, idioma: true },
+      select: { id: true, nome: true, email: true, role: true, ativo: true, pais: true, moeda: true, idioma: true, contaId: true },
     });
 
     res.json(usuario);

@@ -12,6 +12,7 @@ router.use(autenticar);
 router.get('/', async (req, res, next) => {
   try {
     const chips = await prisma.chip.findMany({
+      where: { contaId: req.usuario.contaId },
       orderBy: { criadoEm: 'desc' },
       include: {
         _count: {
@@ -81,7 +82,7 @@ router.post('/sincronizar', async (req, res, next) => {
       if (existente) { jaExistentes.push(s.nome); continue; }
 
       const chip = await prisma.chip.create({
-        data: { nome: s.profileName || s.nome, numero: s.numero, instanciaEvolution: s.nome },
+        data: { nome: s.profileName || s.nome, numero: s.numero, instanciaEvolution: s.nome, contaId: req.usuario.contaId },
       });
       importados.push(chip);
     }
@@ -118,7 +119,7 @@ router.post('/', async (req, res, next) => {
 
     // Salvar chip no banco mesmo se Evolution falhar
     const chip = await prisma.chip.create({
-      data: { nome, numero: '', instanciaEvolution },
+      data: { nome, numero: '', instanciaEvolution, contaId: req.usuario.contaId },
     });
 
     res.status(201).json({ ...chip, erroEvolution });
@@ -130,8 +131,8 @@ router.post('/', async (req, res, next) => {
 // GET /api/chips/:id/qrcode - Gerar QR Code para conectar WhatsApp
 router.get('/:id/qrcode', async (req, res, next) => {
   try {
-    const chip = await prisma.chip.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const chip = await prisma.chip.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!chip) {
@@ -163,8 +164,8 @@ router.get('/:id/qrcode', async (req, res, next) => {
 // POST /api/chips/:id/pairingcode - Gerar codigo de pareamento por numero
 router.post('/:id/pairingcode', async (req, res, next) => {
   try {
-    const chip = await prisma.chip.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const chip = await prisma.chip.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!chip) {
@@ -190,8 +191,8 @@ router.post('/:id/pairingcode', async (req, res, next) => {
 // GET /api/chips/:id/status - Verificar status da conexao
 router.get('/:id/status', async (req, res, next) => {
   try {
-    const chip = await prisma.chip.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const chip = await prisma.chip.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!chip) {
@@ -209,8 +210,8 @@ router.get('/:id/status', async (req, res, next) => {
 // POST /api/chips/:id/webhook - Configurar webhook do chip
 router.post('/:id/webhook', async (req, res, next) => {
   try {
-    const chip = await prisma.chip.findUnique({
-      where: { id: parseInt(req.params.id) },
+    const chip = await prisma.chip.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
     });
 
     if (!chip) {
@@ -245,6 +246,12 @@ router.delete('/:id', async (req, res, next) => {
   try {
     const chipId = parseInt(req.params.id);
 
+    // Verificar que o chip pertence à conta do usuário
+    const chipParaDeletar = await prisma.chip.findFirst({ where: { id: chipId, contaId: req.usuario.contaId } });
+    if (!chipParaDeletar) {
+      return res.status(403).json({ erro: 'Chip não encontrado ou sem permissão' });
+    }
+
     // Remover referências do chip nos clientes
     await prisma.cliente.updateMany({
       where: { chipOrigemId: chipId },
@@ -263,8 +270,7 @@ router.delete('/:id', async (req, res, next) => {
     // Remover conversas vinculadas
     await prisma.conversa.deleteMany({ where: { chipId } });
 
-    // Buscar instancia antes de deletar
-    const chipParaDeletar = await prisma.chip.findUnique({ where: { id: chipId } });
+    // Usar instancia do chip já buscado no início
     const instancia = chipParaDeletar?.instanciaEvolution;
 
     // Deletar chip
@@ -293,7 +299,7 @@ router.get('/:id/relatorio', async (req, res, next) => {
 
     const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
 
-    const chip = await prisma.chip.findUnique({ where: { id: chipId } });
+    const chip = await prisma.chip.findFirst({ where: { id: chipId, contaId: req.usuario.contaId } });
     if (!chip) {
       return res.status(404).json({ erro: 'Chip nao encontrado' });
     }

@@ -7,10 +7,10 @@ const { emitir } = require('./socketManager');
 const prisma = new PrismaClient();
 
 // Inicia um funil para um lead
-async function iniciarFunil(clienteId, chipId, funilIdEspecifico = null) {
-  // Buscar funil específico ou o primeiro ativo
+async function iniciarFunil(clienteId, chipId, contaId = null, funilIdEspecifico = null) {
+  // Buscar funil específico ou o primeiro ativo (filtrado por conta se disponível)
   const funil = await prisma.funil.findFirst({
-    where: funilIdEspecifico ? { id: funilIdEspecifico } : { ativo: true },
+    where: funilIdEspecifico ? { id: funilIdEspecifico } : (contaId ? { ativo: true, contaId } : { ativo: true }),
     orderBy: { criadoEm: 'asc' },
   });
 

@@ -19,6 +19,7 @@ model Usuario {
   moeda    String   @default("BRL")
   idioma   String   @default("pt")
   criadoEm DateTime @default(now()) @map("criado_em")
+  contaId  Int?     @map("conta_id")
 
   @@map("usuarios")
 }
@@ -31,6 +32,8 @@ model Chip {
   instanciaEvolution String   @map("instancia_evolution")
   ativo              Boolean  @default(true)
   criadoEm           DateTime @default(now()) @map("criado_em")
+
+  contaId      Int             @map("conta_id")
 
   clientes     Cliente[]
   conversas    Conversa[]
@@ -45,11 +48,13 @@ model Chip {
 model Cliente {
   id           Int      @id @default(autoincrement())
   nome         String?
-  telefone     String   @unique
+  telefone     String
   chipOrigemId Int?     @map("chip_origem_id")
   status       String   @default("novo") // novo, engajado, negociando, comprou, perdido
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  contaId      Int             @map("conta_id")
 
   chipOrigem   Chip?           @relation(fields: [chipOrigemId], references: [id])
   conversas    Conversa[]
@@ -60,16 +65,19 @@ model Cliente {
   execucoes    FunilExecucao[]
   atendimentos Atendimento[]
 
+  @@unique([telefone, contaId])
   @@map("clientes")
 }
 
 // Tags para categorizar leads
 model Tag {
   id       Int          @id @default(autoincrement())
-  nome     String       @unique
+  nome     String
   cor      String       @default("#3B82F6")
+  contaId  Int          @map("conta_id")
   clientes ClienteTag[]
 
+  @@unique([nome, contaId])
   @@map("tags")
 }
 
@@ -126,7 +134,8 @@ model Funil {
   criadoEm     DateTime @default(now()) @map("criado_em")
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
-  execucoes FunilExecucao[]
+  contaId      Int             @map("conta_id")
+  execucoes    FunilExecucao[]
 
   @@map("funis")
 }
@@ -210,19 +219,23 @@ model Atendimento {
 
 // Configurações gerais do sistema (chave-valor)
 model Configuracao {
-  id    Int    @id @default(autoincrement())
-  chave String @unique
-  valor String
+  id      Int    @id @default(autoincrement())
+  chave   String
+  valor   String
+  contaId Int    @map("conta_id")
 
+  @@unique([chave, contaId])
   @@map("configuracoes")
 }
 
 // Números bloqueados
 model Blacklist {
   id       Int      @id @default(autoincrement())
-  telefone String   @unique
+  telefone String
   motivo   String?
   criadoEm DateTime @default(now()) @map("criado_em")
+  contaId  Int      @map("conta_id")
 
+  @@unique([telefone, contaId])
   @@map("blacklist")
 }
