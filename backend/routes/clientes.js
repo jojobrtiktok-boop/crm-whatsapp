@@ -209,6 +209,54 @@ router.post('/:id/anotacoes', async (req, res, next) => {
   }
 });
 
+// DELETE /api/clientes/todos - Excluir todos os clientes da conta
+router.delete('/todos', async (req, res, next) => {
+  try {
+    const contaId = req.usuario.contaId;
+    const clienteIds = (await prisma.cliente.findMany({ where: { contaId }, select: { id: true } })).map((c) => c.id);
+    if (clienteIds.length === 0) return res.json({ mensagem: 'Nenhum cliente para excluir' });
+
+    await prisma.$transaction([
+      prisma.clienteTag.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.anotacao.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.conversa.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.funilExecucao.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.atendimento.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.comprovante.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.venda.deleteMany({ where: { clienteId: { in: clienteIds } } }),
+      prisma.cliente.deleteMany({ where: { contaId } }),
+    ]);
+
+    res.json({ mensagem: 'Todos os clientes excluídos' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/clientes/:id - Excluir cliente
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const clienteId = parseInt(req.params.id);
+    const existe = await prisma.cliente.findFirst({ where: { id: clienteId, contaId: req.usuario.contaId } });
+    if (!existe) return res.status(404).json({ erro: 'Cliente não encontrado' });
+
+    await prisma.$transaction([
+      prisma.clienteTag.deleteMany({ where: { clienteId } }),
+      prisma.anotacao.deleteMany({ where: { clienteId } }),
+      prisma.conversa.deleteMany({ where: { clienteId } }),
+      prisma.funilExecucao.deleteMany({ where: { clienteId } }),
+      prisma.atendimento.deleteMany({ where: { clienteId } }),
+      prisma.comprovante.deleteMany({ where: { clienteId } }),
+      prisma.venda.deleteMany({ where: { clienteId } }),
+      prisma.cliente.delete({ where: { id: clienteId } }),
+    ]);
+
+    res.json({ mensagem: 'Cliente excluído' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/clientes/:id/foto - Buscar foto de perfil do WhatsApp
 router.get('/:id/foto', async (req, res, next) => {
   try {

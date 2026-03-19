@@ -175,4 +175,40 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
+// DELETE /api/vendas/todas - Excluir todas as vendas da conta
+router.delete('/todas', async (req, res, next) => {
+  try {
+    const contaId = req.usuario.contaId;
+    const vendaIds = (await prisma.venda.findMany({ where: { chip: { contaId } }, select: { id: true } })).map((v) => v.id);
+    if (vendaIds.length === 0) return res.json({ mensagem: 'Nenhuma venda para excluir' });
+
+    await prisma.$transaction([
+      prisma.comprovante.deleteMany({ where: { vendaId: { in: vendaIds } } }),
+      prisma.venda.deleteMany({ where: { id: { in: vendaIds } } }),
+    ]);
+
+    res.json({ mensagem: 'Todas as vendas excluídas' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// DELETE /api/vendas/:id - Excluir venda
+router.delete('/:id', async (req, res, next) => {
+  try {
+    const vendaId = parseInt(req.params.id);
+    const existe = await prisma.venda.findFirst({ where: { id: vendaId, chip: { contaId: req.usuario.contaId } } });
+    if (!existe) return res.status(404).json({ erro: 'Venda não encontrada' });
+
+    await prisma.$transaction([
+      prisma.comprovante.deleteMany({ where: { vendaId } }),
+      prisma.venda.delete({ where: { id: vendaId } }),
+    ]);
+
+    res.json({ mensagem: 'Venda excluída' });
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;

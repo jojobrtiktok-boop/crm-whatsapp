@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Filter, X, MessageCircle, Tag, StickyNote, ChevronRight } from 'lucide-react';
+import { Search, X, MessageCircle, ChevronRight, Trash2 } from 'lucide-react';
 import api from '../api';
 import { useSocketEvent } from '../hooks/useSocket';
 
@@ -61,6 +61,27 @@ export default function Clientes() {
     }
   }
 
+  async function excluirCliente(e, clienteId) {
+    e.stopPropagation();
+    if (!confirm('Excluir este lead? Todas as conversas e vendas vinculadas serão removidas.')) return;
+    try {
+      await api.delete(`/clientes/${clienteId}`);
+      carregarDados();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao excluir');
+    }
+  }
+
+  async function excluirTodos() {
+    if (!confirm(`Excluir TODOS os ${clientes.length} leads? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await api.delete('/clientes/todos');
+      carregarDados();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao excluir');
+    }
+  }
+
   async function mudarStatus(clienteId, novoStatus) {
     try {
       await api.put(`/clientes/${clienteId}`, { status: novoStatus });
@@ -89,6 +110,14 @@ export default function Clientes() {
           >
             Lista
           </button>
+          {clientes.length > 0 && (
+            <button
+              onClick={excluirTodos}
+              className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-red-50 text-red-600 hover:bg-red-100"
+            >
+              <Trash2 size={14} /> Excluir Todos
+            </button>
+          )}
         </div>
       </div>
 
@@ -145,8 +174,18 @@ export default function Clientes() {
                     onClick={() => abrirDetalhe(cliente)}
                     className="bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:shadow-md transition-shadow"
                   >
-                    <p className="font-medium text-sm text-gray-800">{cliente.nome || 'Sem nome'}</p>
-                    <p className="text-xs text-gray-500 mt-1">{cliente.telefone}</p>
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm text-gray-800">{cliente.nome || 'Sem nome'}</p>
+                        <p className="text-xs text-gray-500">{cliente.telefone}</p>
+                      </div>
+                      <button
+                        onClick={(e) => excluirCliente(e, cliente.id)}
+                        className="shrink-0 text-gray-300 hover:text-red-500 p-0.5"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                     {cliente.chipOrigem && (
                       <p className="text-xs text-gray-400 mt-1">{cliente.chipOrigem.nome}</p>
                     )}
@@ -212,12 +251,20 @@ export default function Clientes() {
                     </div>
                   </td>
                   <td className="px-4 py-3">
-                    <button
-                      onClick={() => abrirDetalhe(cliente)}
-                      className="text-primary-600 hover:text-primary-800"
-                    >
-                      <ChevronRight size={16} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => abrirDetalhe(cliente)}
+                        className="text-primary-600 hover:text-primary-800"
+                      >
+                        <ChevronRight size={16} />
+                      </button>
+                      <button
+                        onClick={(e) => excluirCliente(e, cliente.id)}
+                        className="text-gray-300 hover:text-red-500"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

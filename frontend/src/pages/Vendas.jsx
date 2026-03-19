@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Filter, Eye, DollarSign } from 'lucide-react';
+import { Download, Eye, Trash2 } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -56,6 +56,26 @@ export default function Vendas() {
     }
   }
 
+  async function excluirVenda(vendaId) {
+    if (!confirm('Excluir esta venda?')) return;
+    try {
+      await api.delete(`/vendas/${vendaId}`);
+      carregarVendas();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao excluir');
+    }
+  }
+
+  async function excluirTodas() {
+    if (!confirm(`Excluir TODAS as vendas? Esta ação não pode ser desfeita.`)) return;
+    try {
+      await api.delete('/vendas/todas');
+      carregarVendas();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao excluir');
+    }
+  }
+
   async function atualizarStatus(vendaId, novoStatus) {
     try {
       await api.put(`/vendas/${vendaId}`, { status: novoStatus });
@@ -70,12 +90,22 @@ export default function Vendas() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Vendas</h1>
-        <button
-          onClick={exportarCSV}
-          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"
-        >
-          <Download size={16} /> Exportar CSV
-        </button>
+        <div className="flex gap-2">
+          {vendas.length > 0 && (
+            <button
+              onClick={excluirTodas}
+              className="flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg text-sm hover:bg-red-100"
+            >
+              <Trash2 size={16} /> Excluir Todas
+            </button>
+          )}
+          <button
+            onClick={exportarCSV}
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"
+          >
+            <Download size={16} /> Exportar CSV
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -154,12 +184,20 @@ export default function Vendas() {
                   {new Date(venda.criadoEm).toLocaleDateString('pt-BR')}
                 </td>
                 <td className="px-4 py-3">
-                  <button
-                    onClick={() => setVendaSelecionada(venda)}
-                    className="text-primary-600 hover:text-primary-800"
-                  >
-                    <Eye size={16} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setVendaSelecionada(venda)}
+                      className="text-primary-600 hover:text-primary-800"
+                    >
+                      <Eye size={16} />
+                    </button>
+                    <button
+                      onClick={() => excluirVenda(venda.id)}
+                      className="text-gray-300 hover:text-red-500"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
