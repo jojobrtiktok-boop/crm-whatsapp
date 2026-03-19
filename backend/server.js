@@ -48,6 +48,7 @@ app.use('/api/whatsapp', require('./routes/whatsapp'));
 app.use('/api/configuracoes', require('./routes/configuracoes'));
 app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/blacklist', require('./routes/blacklist'));
+app.use('/api/upload', require('./routes/upload'));
 
 // Servir frontend em produção
 if (config.nodeEnv === 'production') {

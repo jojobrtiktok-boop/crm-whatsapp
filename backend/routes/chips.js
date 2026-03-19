@@ -153,14 +153,40 @@ router.put('/:id', async (req, res, next) => {
   }
 });
 
-// DELETE /api/chips/:id - Desativar chip
+// DELETE /api/chips/:id - Deletar chip
 router.delete('/:id', async (req, res, next) => {
   try {
-    const chip = await prisma.chip.update({
-      where: { id: parseInt(req.params.id) },
-      data: { ativo: false },
+    const chipId = parseInt(req.params.id);
+
+    // Remover referências do chip nos clientes
+    await prisma.cliente.updateMany({
+      where: { chipOrigemId: chipId },
+      data: { chipOrigemId: null },
     });
-    res.json({ mensagem: 'Chip desativado', chip });
+
+    // Remover execuções de funil vinculadas
+    await prisma.funilExecucao.deleteMany({ where: { chipId } });
+
+    // Remover comprovantes vinculados
+    await prisma.comprovante.deleteMany({ where: { chipId } });
+
+    // Remover vendas vinculadas
+    await prisma.venda.deleteMany({ where: { chipId } });
+
+    // Remover conversas vinculadas
+    await prisma.conversa.deleteMany({ where: { chipId } });
+
+    // Deletar chip
+    await prisma.chip.delete({ where: { id: chipId } });
+
+    // Tentar deletar instancia na Evolution API
+    try {
+      await evolutionApi.deletarInstancia(
+        (await prisma.chip.findUnique({ where: { id: chipId } }))?.instanciaEvolution
+      );
+    } catch {}
+
+    res.json({ mensagem: 'Chip removido com sucesso' });
   } catch (err) {
     next(err);
   }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ReactFlow,
@@ -14,7 +14,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   Save, ArrowLeft, MessageSquare, Image, Mic, Video,
-  List, Clock, GitBranch, Bot, Receipt, Tag, ArrowRightLeft, MessageCircle,
+  Clock, GitBranch, Bot, Tag, MessageCircle, Play, Upload, X,
 } from 'lucide-react';
 import api from '../api';
 
@@ -22,25 +22,45 @@ import api from '../api';
 const TIPOS_BLOCOS = [
   { type: 'texto', label: 'Texto', icon: MessageSquare, cor: '#3b82f6' },
   { type: 'imagem', label: 'Imagem', icon: Image, cor: '#8b5cf6' },
-  { type: 'audio', label: 'Áudio', icon: Mic, cor: '#ec4899' },
-  { type: 'video', label: 'Vídeo', icon: Video, cor: '#f59e0b' },
-  { type: 'botoes', label: 'Botões', icon: List, cor: '#22c55e' },
+  { type: 'audio', label: 'Audio', icon: Mic, cor: '#ec4899' },
+  { type: 'video', label: 'Video', icon: Video, cor: '#f59e0b' },
   { type: 'delay', label: 'Delay', icon: Clock, cor: '#6b7280' },
-  { type: 'condicao', label: 'Condição', icon: GitBranch, cor: '#ef4444' },
+  { type: 'condicao', label: 'Condicao', icon: GitBranch, cor: '#ef4444' },
   { type: 'ia', label: 'IA', icon: Bot, cor: '#06b6d4' },
   { type: 'esperar_resposta', label: 'Esperar Resposta', icon: MessageCircle, cor: '#0ea5e9' },
-  { type: 'comprovante', label: 'Comprovante', icon: Receipt, cor: '#14b8a6' },
   { type: 'tag', label: 'Tag', icon: Tag, cor: '#f97316' },
-  { type: 'transferencia', label: 'Transferir', icon: ArrowRightLeft, cor: '#a855f7' },
 ];
 
-// Componente de nó personalizado
+// Componente de no personalizado
 function BlocoNode({ data }) {
+  const isInicio = data.blocoType === 'inicio';
+
+  if (isInicio) {
+    return (
+      <div className="bg-green-500 rounded-full px-6 py-3 shadow-md text-center min-w-[120px]">
+        <div className="flex items-center justify-center gap-2">
+          <Play size={16} className="text-white" />
+          <span className="text-sm font-bold text-white">INICIO</span>
+        </div>
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          style={{
+            background: '#22c55e',
+            width: 14,
+            height: 14,
+            border: '3px solid white',
+            bottom: -7,
+          }}
+        />
+      </div>
+    );
+  }
+
   const tipoInfo = TIPOS_BLOCOS.find((t) => t.type === data.blocoType) || TIPOS_BLOCOS[0];
   const Icone = tipoInfo.icon;
   const isCondicao = data.blocoType === 'condicao';
   const isEsperarResposta = data.blocoType === 'esperar_resposta';
-  const isBotoes = data.blocoType === 'botoes';
 
   return (
     <div
@@ -133,6 +153,8 @@ export default function FunilEditor() {
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [blocoSelecionado, setBlocoSelecionado] = useState(null);
   const [salvando, setSalvando] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Carregar funil
   useEffect(() => {
@@ -141,9 +163,8 @@ export default function FunilEditor() {
         const res = await api.get(`/funis/${id}`);
         setFunil(res.data);
 
-        // Converter blocos para nodes do React Flow
         const blocos = res.data.blocos || [];
-        const flowNodes = blocos.map((bloco) => ({
+        let flowNodes = blocos.map((bloco) => ({
           id: bloco.id,
           type: 'blocoNode',
           position: bloco.position || { x: 250, y: 50 },
@@ -154,7 +175,20 @@ export default function FunilEditor() {
           },
         }));
 
-        // Converter conexões para edges
+        // Se nao tem bloco de inicio, adicionar
+        const temInicio = flowNodes.some((n) => n.data.blocoType === 'inicio');
+        if (!temInicio) {
+          flowNodes = [
+            {
+              id: 'inicio',
+              type: 'blocoNode',
+              position: { x: 250, y: 20 },
+              data: { blocoType: 'inicio', preview: 'Inicio do funil' },
+            },
+            ...flowNodes,
+          ];
+        }
+
         const conexoes = res.data.conexoes || [];
         const flowEdges = conexoes.map((con, i) => ({
           id: `edge-${i}`,
@@ -176,18 +210,16 @@ export default function FunilEditor() {
 
   function getPreview(bloco) {
     switch (bloco.type) {
+      case 'inicio': return 'Inicio do funil';
       case 'texto': return bloco.data?.mensagem?.substring(0, 50) || 'Mensagem de texto';
-      case 'imagem': return 'Enviar imagem';
-      case 'audio': return 'Enviar áudio';
-      case 'video': return 'Enviar vídeo';
-      case 'botoes': return `${bloco.data?.opcoes?.length || 0} opções`;
+      case 'imagem': return bloco.data?.nomeArquivo || bloco.data?.url || 'Enviar imagem';
+      case 'audio': return bloco.data?.nomeArquivo || bloco.data?.url || 'Enviar audio';
+      case 'video': return bloco.data?.nomeArquivo || bloco.data?.url || 'Enviar video';
       case 'delay': return `Aguardar ${bloco.data?.tempo || 0} ${bloco.data?.unidade || 'minutos'}`;
-      case 'condicao': return `Se contém: ${bloco.data?.valorEsperado || '...'}`;
+      case 'condicao': return `Se contem: ${bloco.data?.valorEsperado || '...'}`;
       case 'ia': return bloco.data?.mensagemBase?.substring(0, 50) || 'Mensagem com IA';
       case 'esperar_resposta': return `Esperar ${bloco.data?.tempoTimeout || 30} ${bloco.data?.unidadeTimeout || 'minutos'}`;
-      case 'comprovante': return 'Aguardar comprovante';
-      case 'tag': return `Marcar tag`;
-      case 'transferencia': return 'Transferir para humano';
+      case 'tag': return 'Marcar tag';
       default: return bloco.type;
     }
   }
@@ -197,7 +229,6 @@ export default function FunilEditor() {
     [setEdges]
   );
 
-  // Encontrar o ultimo bloco na sequencia (o mais abaixo)
   function getUltimoBloco(currentNodes) {
     if (currentNodes.length === 0) return null;
     return currentNodes.reduce((ultimo, n) =>
@@ -205,7 +236,6 @@ export default function FunilEditor() {
     , currentNodes[0]);
   }
 
-  // Adicionar novo bloco (conecta automaticamente ao anterior)
   function adicionarBloco(tipo) {
     const novoId = `bloco-${Date.now()}`;
 
@@ -240,11 +270,29 @@ export default function FunilEditor() {
     });
   }
 
-  // Salvar funil
+  // Upload de arquivo
+  async function uploadArquivo(file, campo) {
+    if (!file || !blocoSelecionado) return;
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('arquivo', file);
+      const res = await api.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      atualizarBloco('url', res.data.url);
+      atualizarBloco('nomeArquivo', file.name);
+    } catch (err) {
+      alert('Erro ao enviar arquivo');
+      console.error(err);
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function salvar() {
     setSalvando(true);
     try {
-      // Converter nodes de volta para formato de blocos
       const blocos = nodes.map((node) => ({
         id: node.id,
         type: node.data.blocoType,
@@ -252,7 +300,6 @@ export default function FunilEditor() {
         data: { ...node.data, blocoType: undefined, preview: undefined },
       }));
 
-      // Converter edges de volta para conexões
       const conexoes = edges.map((edge) => ({
         source: edge.source,
         target: edge.target,
@@ -275,12 +322,12 @@ export default function FunilEditor() {
     }
   }
 
-  // Selecionar nó para editar
   function onNodeClick(_, node) {
+    // Nao selecionar bloco de inicio
+    if (node.data.blocoType === 'inicio') return;
     setBlocoSelecionado(node);
   }
 
-  // Atualizar dados do bloco selecionado
   function atualizarBloco(campo, valor) {
     if (!blocoSelecionado) return;
 
@@ -360,7 +407,7 @@ export default function FunilEditor() {
         </ReactFlow>
       </div>
 
-      {/* Painel de configuração do bloco (direita) */}
+      {/* Painel de configuracao do bloco (direita) */}
       {blocoSelecionado && (
         <div className="w-72 bg-white border-l border-gray-200 p-4 overflow-y-auto">
           <div className="flex items-center justify-between mb-4">
@@ -371,7 +418,7 @@ export default function FunilEditor() {
           </div>
 
           <div className="space-y-3">
-            {/* Campos dinâmicos por tipo de bloco */}
+            {/* Texto */}
             {blocoSelecionado.data.blocoType === 'texto' && (
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Mensagem</label>
@@ -385,6 +432,166 @@ export default function FunilEditor() {
               </div>
             )}
 
+            {/* Imagem */}
+            {blocoSelecionado.data.blocoType === 'imagem' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Enviar imagem do PC</label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-primary-400 hover:bg-primary-50 transition-colors"
+                  >
+                    {uploading ? (
+                      <div className="text-xs text-gray-500">Enviando...</div>
+                    ) : blocoSelecionado.data.nomeArquivo ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-green-600 truncate">{blocoSelecionado.data.nomeArquivo}</span>
+                        <button onClick={(e) => { e.stopPropagation(); atualizarBloco('url', ''); atualizarBloco('nomeArquivo', ''); }} className="text-red-400 hover:text-red-600">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload size={20} className="text-gray-400" />
+                        <span className="text-xs text-gray-500">Clique para enviar imagem</span>
+                        <span className="text-[10px] text-gray-400">JPG, PNG, WebP</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => uploadArquivo(e.target.files[0])}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ou cole a URL da imagem</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.url || ''}
+                    onChange={(e) => atualizarBloco('url', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Legenda</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.legenda || ''}
+                    onChange={(e) => atualizarBloco('legenda', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Audio */}
+            {blocoSelecionado.data.blocoType === 'audio' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Enviar audio do PC</label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-pink-400 hover:bg-pink-50 transition-colors"
+                  >
+                    {uploading ? (
+                      <div className="text-xs text-gray-500">Enviando...</div>
+                    ) : blocoSelecionado.data.nomeArquivo ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-green-600 truncate">{blocoSelecionado.data.nomeArquivo}</span>
+                        <button onClick={(e) => { e.stopPropagation(); atualizarBloco('url', ''); atualizarBloco('nomeArquivo', ''); }} className="text-red-400 hover:text-red-600">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload size={20} className="text-gray-400" />
+                        <span className="text-xs text-gray-500">Clique para enviar audio</span>
+                        <span className="text-[10px] text-gray-400">MP3, OGG, WAV, M4A</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="audio/*"
+                    className="hidden"
+                    onChange={(e) => uploadArquivo(e.target.files[0])}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ou cole a URL do audio</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.url || ''}
+                    onChange={(e) => atualizarBloco('url', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                    placeholder="https://..."
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Video */}
+            {blocoSelecionado.data.blocoType === 'video' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Enviar video do PC</label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-yellow-400 hover:bg-yellow-50 transition-colors"
+                  >
+                    {uploading ? (
+                      <div className="text-xs text-gray-500">Enviando...</div>
+                    ) : blocoSelecionado.data.nomeArquivo ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-green-600 truncate">{blocoSelecionado.data.nomeArquivo}</span>
+                        <button onClick={(e) => { e.stopPropagation(); atualizarBloco('url', ''); atualizarBloco('nomeArquivo', ''); }} className="text-red-400 hover:text-red-600">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <Upload size={20} className="text-gray-400" />
+                        <span className="text-xs text-gray-500">Clique para enviar video</span>
+                        <span className="text-[10px] text-gray-400">MP4, AVI, MOV</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="video/*"
+                    className="hidden"
+                    onChange={(e) => uploadArquivo(e.target.files[0])}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ou cole a URL do video</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.url || ''}
+                    onChange={(e) => atualizarBloco('url', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Legenda</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.legenda || ''}
+                    onChange={(e) => atualizarBloco('legenda', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* IA */}
             {blocoSelecionado.data.blocoType === 'ia' && (
               <>
                 <div>
@@ -406,7 +613,7 @@ export default function FunilEditor() {
                     <option value="formal">Formal</option>
                     <option value="informal">Informal</option>
                     <option value="vendedor">Vendedor</option>
-                    <option value="empatico">Empático</option>
+                    <option value="empatico">Empatico</option>
                   </select>
                 </div>
                 <div>
@@ -416,12 +623,13 @@ export default function FunilEditor() {
                     onChange={(e) => atualizarBloco('contexto', e.target.value)}
                     className="w-full rounded border-gray-300 text-xs"
                     rows={2}
-                    placeholder="Info sobre o produto/serviço"
+                    placeholder="Info sobre o produto/servico"
                   />
                 </div>
               </>
             )}
 
+            {/* Delay */}
             {blocoSelecionado.data.blocoType === 'delay' && (
               <div className="flex gap-2">
                 <div className="flex-1">
@@ -449,39 +657,17 @@ export default function FunilEditor() {
               </div>
             )}
 
-            {blocoSelecionado.data.blocoType === 'imagem' && (
-              <>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">URL da Imagem</label>
-                  <input
-                    type="text"
-                    value={blocoSelecionado.data.url || ''}
-                    onChange={(e) => atualizarBloco('url', e.target.value)}
-                    className="w-full rounded border-gray-300 text-xs"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Legenda</label>
-                  <input
-                    type="text"
-                    value={blocoSelecionado.data.legenda || ''}
-                    onChange={(e) => atualizarBloco('legenda', e.target.value)}
-                    className="w-full rounded border-gray-300 text-xs"
-                  />
-                </div>
-              </>
-            )}
-
+            {/* Condicao */}
             {blocoSelecionado.data.blocoType === 'condicao' && (
               <>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de condição</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Tipo de condicao</label>
                   <select
                     value={blocoSelecionado.data.condicao || 'contem'}
                     onChange={(e) => atualizarBloco('condicao', e.target.value)}
                     className="w-full rounded border-gray-300 text-xs"
                   >
-                    <option value="contem">Contém</option>
+                    <option value="contem">Contem</option>
                     <option value="igual">Igual a</option>
                     <option value="qualquer">Qualquer resposta</option>
                   </select>
@@ -498,19 +684,7 @@ export default function FunilEditor() {
               </>
             )}
 
-            {blocoSelecionado.data.blocoType === 'transferencia' && (
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Mensagem</label>
-                <textarea
-                  value={blocoSelecionado.data.mensagem || ''}
-                  onChange={(e) => atualizarBloco('mensagem', e.target.value)}
-                  className="w-full rounded border-gray-300 text-xs"
-                  rows={3}
-                  placeholder="Mensagem antes de transferir"
-                />
-              </div>
-            )}
-
+            {/* Esperar Resposta */}
             {blocoSelecionado.data.blocoType === 'esperar_resposta' && (
               <>
                 <div className="bg-blue-50 rounded-lg p-2 mb-1">
@@ -543,20 +717,21 @@ export default function FunilEditor() {
               </>
             )}
 
-            {blocoSelecionado.data.blocoType === 'comprovante' && (
+            {/* Tag */}
+            {blocoSelecionado.data.blocoType === 'tag' && (
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Mensagem</label>
-                <textarea
-                  value={blocoSelecionado.data.mensagem || ''}
-                  onChange={(e) => atualizarBloco('mensagem', e.target.value)}
+                <label className="block text-xs font-medium text-gray-600 mb-1">Nome da tag</label>
+                <input
+                  type="text"
+                  value={blocoSelecionado.data.tag || ''}
+                  onChange={(e) => atualizarBloco('tag', e.target.value)}
                   className="w-full rounded border-gray-300 text-xs"
-                  rows={3}
-                  placeholder="Envie o comprovante de pagamento..."
+                  placeholder="Ex: VIP, Interessado"
                 />
               </div>
             )}
 
-            {/* Botão de deletar bloco */}
+            {/* Botao de deletar bloco */}
             <button
               onClick={() => {
                 setNodes((nds) => nds.filter((n) => n.id !== blocoSelecionado.id));
