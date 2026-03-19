@@ -5,6 +5,9 @@ import { useSocket, useSocketEvent } from '../hooks/useSocket';
 
 // Ícone de ticks de leitura WhatsApp
 function Ticks({ status }) {
+  if (status === 'erro') {
+    return <X size={14} className="text-red-300 shrink-0" title="Falha no envio" />;
+  }
   if (status === 'lido') {
     return <CheckCheck size={14} className="text-blue-300 shrink-0" />;
   }

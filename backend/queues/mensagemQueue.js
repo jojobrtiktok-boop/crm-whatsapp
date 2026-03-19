@@ -69,8 +69,20 @@ mensagemQueue.on('completed', (job) => {
   console.log(`[MensagemQueue] Job ${job.id} concluído`);
 });
 
-mensagemQueue.on('failed', (job, err) => {
+mensagemQueue.on('failed', async (job, err) => {
   console.error(`[MensagemQueue] Job ${job.id} falhou:`, err.message);
+  // Marcar conversa como erro para mostrar X no chat
+  if (job.data.conversaId) {
+    try {
+      await prisma.conversa.update({
+        where: { id: job.data.conversaId },
+        data: { status: 'erro' },
+      });
+      const { emitir } = require('../services/socketManager');
+      const conversa = await prisma.conversa.findUnique({ where: { id: job.data.conversaId } });
+      if (conversa) emitir('mensagem:status', { conversaId: conversa.id, status: 'erro', clienteId: conversa.clienteId });
+    } catch {}
+  }
 });
 
 module.exports = mensagemQueue;
