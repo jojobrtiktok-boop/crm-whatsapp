@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, User, Clock, CheckCircle, PhoneOff, GitBranch, Play } from 'lucide-react';
+import { Send, User, Clock, CheckCircle, PhoneOff, GitBranch, Play, Smartphone } from 'lucide-react';
 import api from '../api';
 import { useSocket, useSocketEvent } from '../hooks/useSocket';
 
@@ -11,8 +11,6 @@ export default function Atendimento() {
   const [chips, setChips] = useState([]);
   const [funis, setFunis] = useState([]);
   const [modalFunil, setModalFunil] = useState(false);
-  const [funilParaAtivar, setFunilParaAtivar] = useState('');
-  const [chipParaFunil, setChipParaFunil] = useState('');
   const chatRef = useRef(null);
   const socket = useSocket();
 
@@ -65,7 +63,6 @@ export default function Atendimento() {
       setConversas(res.data);
       scrollParaBaixo();
 
-      // Entrar na sala do atendimento via socket
       if (socket) {
         socket.emit('atendimento:assumir', { atendimentoId: atend.id });
       }
@@ -77,9 +74,8 @@ export default function Atendimento() {
   async function enviarMensagem() {
     if (!mensagem.trim() || !selecionado) return;
 
-    // Buscar chip do cliente
     const cliente = selecionado.cliente;
-    const chipId = chips[0]?.id; // Usar primeiro chip disponível
+    const chipId = selecionado.cliente?.chipOrigem?.id || chips[0]?.id;
 
     try {
       await api.post('/whatsapp/enviar', {
@@ -89,7 +85,6 @@ export default function Atendimento() {
       });
 
       setMensagem('');
-      // Recarregar conversas
       const res = await api.get(`/clientes/${cliente.id}/conversas`);
       setConversas(res.data);
       scrollParaBaixo();
@@ -113,6 +108,12 @@ export default function Atendimento() {
     setTimeout(() => {
       chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' });
     }, 100);
+  }
+
+  // Buscar nome do chip pelo ID
+  function getNomeChip(chipId) {
+    const chip = chips.find((c) => c.id === chipId);
+    return chip?.nome || chip?.numero?.slice(-4) || '';
   }
 
   const atendimentosPendentes = atendimentos.filter((a) => a.status !== 'finalizado');
@@ -142,7 +143,15 @@ export default function Atendimento() {
                 <p className="text-sm font-medium text-gray-800 truncate">
                   {atend.cliente?.nome || 'Sem nome'}
                 </p>
-                <p className="text-xs text-gray-500 truncate">{atend.cliente?.telefone}</p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs text-gray-500 truncate">{atend.cliente?.telefone}</p>
+                  {atend.cliente?.chipOrigem && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md shrink-0">
+                      <Smartphone size={9} />
+                      {atend.cliente.chipOrigem.nome || atend.cliente.chipOrigem.numero?.slice(-4)}
+                    </span>
+                  )}
+                </div>
               </div>
               <div>
                 {atend.status === 'aguardando' ? (
@@ -170,11 +179,19 @@ export default function Atendimento() {
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
               <h3 className="font-semibold text-gray-800">{selecionado.cliente?.nome || 'Sem nome'}</h3>
-              <p className="text-xs text-gray-500">{selecionado.cliente?.telefone}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-gray-500">{selecionado.cliente?.telefone}</p>
+                {selecionado.cliente?.chipOrigem && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md">
+                    <Smartphone size={10} />
+                    {selecionado.cliente.chipOrigem.nome || selecionado.cliente.chipOrigem.numero?.slice(-4)}
+                  </span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => { setModalFunil(true); setChipParaFunil(chips[0]?.id?.toString() || ''); }}
+                onClick={() => setModalFunil(true)}
                 className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 px-3 py-1.5 bg-primary-50 rounded-lg"
               >
                 <GitBranch size={14} /> Ativar Funil
@@ -203,9 +220,17 @@ export default function Atendimento() {
                   }`}
                 >
                   <p>{msg.conteudo || `[${msg.tipoMidia}]`}</p>
-                  <p className={`text-xs mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
-                    {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+                  <div className={`flex items-center gap-1.5 mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
+                    <span className="text-xs">
+                      {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {msg.tipo === 'recebida' && msg.chipId && (
+                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 text-[9px] font-semibold rounded">
+                        <Smartphone size={8} />
+                        {getNomeChip(msg.chipId)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             ))}

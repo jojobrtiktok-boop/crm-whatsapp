@@ -18,7 +18,14 @@ router.get('/', async (req, res, next) => {
       where,
       include: {
         cliente: {
-          select: { id: true, nome: true, telefone: true, status: true },
+          select: {
+            id: true,
+            nome: true,
+            telefone: true,
+            status: true,
+            chipOrigemId: true,
+            chipOrigem: { select: { id: true, nome: true, numero: true } },
+          },
         },
       },
       orderBy: { criadoEm: 'desc' },

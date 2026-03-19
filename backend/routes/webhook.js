@@ -120,9 +120,14 @@ async function processarMensagem(evento, instancia) {
     chipId: chip.id,
   });
 
-  // Se é imagem, pode ser comprovante
+  // Se é imagem, enviar para IA analisar (pode ser comprovante ou não)
   if (tipoMidia === 'imagem') {
     await processarImagem(evento, instancia, cliente, chip, mensagem);
+  }
+
+  // Se é documento PDF, extrair texto e analisar
+  if (tipoMidia === 'documento' && msgData.documentMessage?.mimetype === 'application/pdf') {
+    await processarPDF(evento, instancia, cliente, chip, mensagem);
   }
 
   // Processar resposta dentro do funil (se houver execução ativa)
@@ -173,6 +178,54 @@ async function processarImagem(evento, instancia, cliente, chip, mensagem) {
     }
   } catch (err) {
     console.error('[Webhook] Erro ao processar imagem:', err.message);
+  }
+}
+
+// Processa PDF recebido (possível comprovante)
+async function processarPDF(evento, instancia, cliente, chip, mensagem) {
+  try {
+    const mediaUrl = `${config.evolution.url}/chat/getBase64FromMediaMessage/${instancia}`;
+    const response = await axios.post(
+      mediaUrl,
+      { message: mensagem },
+      { headers: { apikey: config.evolution.apiKey } }
+    );
+
+    if (response.data?.base64) {
+      const nomeArquivo = `documento_${cliente.id}_${Date.now()}.pdf`;
+      const caminhoArquivo = path.join(config.upload.path, 'comprovantes', nomeArquivo);
+
+      fs.mkdirSync(path.dirname(caminhoArquivo), { recursive: true });
+
+      const buffer = Buffer.from(response.data.base64, 'base64');
+      fs.writeFileSync(caminhoArquivo, buffer);
+
+      // Extrair texto do PDF
+      let textoPDF = '';
+      try {
+        const pdfParse = require('pdf-parse');
+        const pdfData = await pdfParse(buffer);
+        textoPDF = pdfData.text;
+        console.log(`[Webhook] Texto extraído do PDF (${textoPDF.length} chars)`);
+      } catch (err) {
+        console.error('[Webhook] Erro ao extrair texto do PDF:', err.message);
+        return;
+      }
+
+      if (textoPDF.trim()) {
+        await comprovanteQueue.add({
+          clienteId: cliente.id,
+          chipId: chip.id,
+          imagemPath: caminhoArquivo,
+          instanciaEvolution: instancia,
+          telefoneCliente: cliente.telefone,
+          textoPDF,
+        });
+        console.log(`[Webhook] PDF enfileirado para análise: ${nomeArquivo}`);
+      }
+    }
+  } catch (err) {
+    console.error('[Webhook] Erro ao processar PDF:', err.message);
   }
 }
 

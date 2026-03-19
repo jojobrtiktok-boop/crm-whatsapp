@@ -1,29 +1,42 @@
-// Orquestrador: recebe imagem de comprovante → analisa → registra venda
+// Orquestrador: recebe imagem → analisa com IA → se for comprovante, registra venda
 const { PrismaClient } = require('@prisma/client');
-const { analisarComprovante } = require('./claudeVision');
+const { analisarImagem, analisarTextoPDF } = require('./claudeVision');
 const { emitir } = require('./socketManager');
 const { enviarTexto } = require('./evolutionApi');
 
 const prisma = new PrismaClient();
 
-// Processa comprovante recebido de um cliente
-async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEvolution, telefoneCliente }) {
-  console.log(`[Comprovante] Processando para cliente ${clienteId}, chip ${chipId}`);
-
-  // Criar registro do comprovante como "analisando"
-  const comprovante = await prisma.comprovante.create({
-    data: {
-      clienteId,
-      chipId,
-      imagemPath,
-      status: 'analisando',
-    },
-  });
+// Processa imagem recebida de um cliente (pode ou não ser comprovante)
+async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEvolution, telefoneCliente, textoPDF }) {
+  console.log(`[Comprovante] Analisando imagem/documento para cliente ${clienteId}, chip ${chipId}`);
 
   try {
-    // Analisar imagem com Claude Vision
-    const dados = await analisarComprovante(imagemPath);
-    console.log('[Comprovante] Dados extraídos:', dados);
+    // Analisar com Claude Vision (imagem) ou texto (PDF)
+    let dados;
+    if (textoPDF) {
+      dados = await analisarTextoPDF(textoPDF);
+    } else {
+      dados = await analisarImagem(imagemPath);
+    }
+    console.log('[Comprovante] Resultado da análise:', dados);
+
+    // Se não é comprovante, apenas logar e sair
+    if (!dados.eh_comprovante) {
+      console.log(`[Comprovante] Imagem não é comprovante: ${dados.descricao || 'N/A'}`);
+      return { status: 'nao_comprovante', descricao: dados.descricao };
+    }
+
+    console.log('[Comprovante] Comprovante detectado! Processando...');
+
+    // Criar registro do comprovante
+    const comprovante = await prisma.comprovante.create({
+      data: {
+        clienteId,
+        chipId,
+        imagemPath: imagemPath || 'pdf',
+        status: 'analisando',
+      },
+    });
 
     // Buscar venda pendente do cliente
     const vendaPendente = await prisma.venda.findFirst({

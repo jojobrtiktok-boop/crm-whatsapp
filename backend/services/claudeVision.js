@@ -1,17 +1,15 @@
-// Serviço de análise de comprovantes com Claude Vision
+// Serviço de análise de imagens com Claude Vision
 const Anthropic = require('@anthropic-ai/sdk');
 const fs = require('fs');
 const config = require('../config');
 
 const anthropic = new Anthropic({ apiKey: config.anthropic.apiKey });
 
-// Analisa imagem de comprovante e extrai dados
-async function analisarComprovante(imagemPath) {
-  // Ler imagem e converter para base64
+// Analisa qualquer imagem recebida e determina se é comprovante
+async function analisarImagem(imagemPath) {
   const imagemBuffer = fs.readFileSync(imagemPath);
   const imagemBase64 = imagemBuffer.toString('base64');
 
-  // Detectar tipo MIME
   const extensao = imagemPath.split('.').pop().toLowerCase();
   const mimeTypes = {
     jpg: 'image/jpeg',
@@ -38,15 +36,20 @@ async function analisarComprovante(imagemPath) {
           },
           {
             type: 'text',
-            text: `Analise este comprovante de pagamento/transferência e extraia as seguintes informações em formato JSON:
+            text: `Analise esta imagem e determine se é um comprovante de pagamento ou transferência bancária (PIX, TED, DOC, boleto pago, etc).
 
+Se NÃO for um comprovante de pagamento, retorne:
+{"eh_comprovante": false, "descricao": "breve descrição do que é a imagem"}
+
+Se FOR um comprovante de pagamento, extraia os dados e retorne:
 {
+  "eh_comprovante": true,
   "nome_pagador": "nome de quem fez o pagamento",
   "valor": 0.00,
   "data_pagamento": "DD/MM/AAAA",
   "banco": "nome do banco",
   "tipo_transferencia": "PIX, TED, DOC, etc",
-  "valido": true ou false (se parece ser um comprovante real)
+  "valido": true
 }
 
 Se não conseguir identificar algum campo, coloque null.
@@ -57,19 +60,63 @@ Retorne APENAS o JSON, sem texto adicional.`,
     ],
   });
 
-  // Extrair JSON da resposta
   const textoResposta = response.content[0].text.trim();
   try {
-    // Tentar parsear diretamente
     return JSON.parse(textoResposta);
   } catch {
-    // Se falhar, tentar extrair JSON do texto
     const match = textoResposta.match(/\{[\s\S]*\}/);
     if (match) {
       return JSON.parse(match[0]);
     }
-    throw new Error('Não foi possível extrair dados do comprovante');
+    throw new Error('Não foi possível analisar a imagem');
   }
 }
 
-module.exports = { analisarComprovante };
+// Analisa texto extraído de PDF para detectar comprovante
+async function analisarTextoPDF(texto) {
+  const response = await anthropic.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 1024,
+    messages: [
+      {
+        role: 'user',
+        content: `Analise o texto abaixo extraído de um PDF e determine se é um comprovante de pagamento ou transferência bancária.
+
+Texto do PDF:
+---
+${texto.substring(0, 3000)}
+---
+
+Se NÃO for um comprovante de pagamento, retorne:
+{"eh_comprovante": false, "descricao": "breve descrição do conteúdo"}
+
+Se FOR um comprovante de pagamento, extraia os dados e retorne:
+{
+  "eh_comprovante": true,
+  "nome_pagador": "nome de quem fez o pagamento",
+  "valor": 0.00,
+  "data_pagamento": "DD/MM/AAAA",
+  "banco": "nome do banco",
+  "tipo_transferencia": "PIX, TED, DOC, etc",
+  "valido": true
+}
+
+Se não conseguir identificar algum campo, coloque null.
+Retorne APENAS o JSON, sem texto adicional.`,
+      },
+    ],
+  });
+
+  const textoResposta = response.content[0].text.trim();
+  try {
+    return JSON.parse(textoResposta);
+  } catch {
+    const match = textoResposta.match(/\{[\s\S]*\}/);
+    if (match) {
+      return JSON.parse(match[0]);
+    }
+    throw new Error('Não foi possível analisar o texto do PDF');
+  }
+}
+
+module.exports = { analisarImagem, analisarTextoPDF };
