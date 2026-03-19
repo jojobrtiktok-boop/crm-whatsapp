@@ -1,197 +1,230 @@
-// Cliente para WAHA (WhatsApp HTTP API) - engine NOWEB (Baileys)
-// Suporta @lid nativamente
+// Cliente para WPPConnect Server
+// Suporta mídia e @lid via WhatsApp Web injection
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
 const config = require('../config');
 
-const api = axios.create({
-  baseURL: config.evolution.url,
-  headers: {
-    'Content-Type': 'application/json',
-    'X-Api-Key': config.evolution.apiKey,
-  },
-  timeout: 30000,
-});
+const BASE_URL = config.evolution.url;
+const SECRET_KEY = config.evolution.apiKey;
 
-// Converte número/JID para formato WAHA (@c.us)
-function formatChatId(telefone) {
+// Cache de tokens por sessão
+const tokenCache = {};
+
+// Formata número para WPPConnect (mantém @lid, converte outros)
+function formatPhone(telefone) {
   if (!telefone) return telefone;
-  if (telefone.includes('@lid')) return telefone;           // @lid: manter
+  if (telefone.includes('@lid')) return telefone;
+  if (telefone.includes('@g.us')) return telefone;
   if (telefone.includes('@s.whatsapp.net')) return telefone.replace('@s.whatsapp.net', '@c.us');
   if (telefone.includes('@c.us')) return telefone;
-  if (telefone.includes('@g.us')) return telefone;
   return `${telefone}@c.us`;
 }
 
-// Lê arquivo local e retorna objeto file para WAHA
-function buildFileObj(urlOrPath, nomeArquivo) {
-  if (urlOrPath && !urlOrPath.startsWith('http')) {
-    const data = fs.readFileSync(urlOrPath).toString('base64');
-    const mimetype = mime.lookup(urlOrPath) || 'application/octet-stream';
-    const filename = nomeArquivo || path.basename(urlOrPath);
-    return { data, mimetype, filename };
-  }
-  return { url: urlOrPath };
+// Obtém token da sessão (gera se não existir)
+async function getToken(sessao) {
+  if (tokenCache[sessao]) return tokenCache[sessao];
+
+  const response = await axios.post(
+    `${BASE_URL}/api/${sessao}/generate-token`,
+    { secretKey: SECRET_KEY },
+    { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
+  );
+  const token = response.data?.token;
+  if (token) tokenCache[sessao] = token;
+  return token;
+}
+
+// Cria cliente axios autenticado para uma sessão
+async function apiFor(sessao) {
+  const token = await getToken(sessao);
+  return axios.create({
+    baseURL: BASE_URL,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    timeout: 30000,
+  });
+}
+
+// Converte arquivo local para base64 com data URI
+function toDataUri(filePath) {
+  const data = fs.readFileSync(filePath).toString('base64');
+  const mimetype = mime.lookup(filePath) || 'application/octet-stream';
+  return `data:${mimetype};base64,${data}`;
 }
 
 // Enviar mensagem de texto
-async function enviarTexto(instancia, telefone, mensagem) {
-  const response = await api.post('/api/sendText', {
-    chatId: formatChatId(telefone),
-    text: mensagem,
-    session: instancia,
+async function enviarTexto(sessao, telefone, mensagem) {
+  const api = await apiFor(sessao);
+  const response = await api.post(`/api/${sessao}/send-message`, {
+    phone: formatPhone(telefone),
+    message: mensagem,
+    isGroup: false,
   });
   return response.data;
 }
 
 // Enviar imagem
-async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
-  const response = await api.post('/api/sendImage', {
-    chatId: formatChatId(telefone),
-    file: buildFileObj(imagemUrl),
-    caption: legenda,
-    session: instancia,
-  });
+async function enviarImagem(sessao, telefone, imagemUrl, legenda = '') {
+  const api = await apiFor(sessao);
+  const isLocal = imagemUrl && !imagemUrl.startsWith('http');
+  const body = isLocal
+    ? {
+        phone: formatPhone(telefone),
+        base64: toDataUri(imagemUrl),
+        filename: path.basename(imagemUrl),
+        caption: legenda,
+      }
+    : {
+        phone: formatPhone(telefone),
+        path: imagemUrl,
+        caption: legenda,
+      };
+  const response = await api.post(`/api/${sessao}/send-image`, body);
   return response.data;
 }
 
 // Enviar áudio PTT
-async function enviarAudio(instancia, telefone, audioUrl) {
-  const response = await api.post('/api/sendVoice', {
-    chatId: formatChatId(telefone),
-    file: buildFileObj(audioUrl),
-    session: instancia,
+async function enviarAudio(sessao, telefone, audioUrl) {
+  const api = await apiFor(sessao);
+  const isLocal = audioUrl && !audioUrl.startsWith('http');
+  const response = await api.post(`/api/${sessao}/send-voice`, {
+    phone: formatPhone(telefone),
+    base64: isLocal ? toDataUri(audioUrl) : audioUrl,
   });
   return response.data;
 }
 
 // Enviar vídeo
-async function enviarVideo(instancia, telefone, videoUrl, legenda = '') {
-  const response = await api.post('/api/sendVideo', {
-    chatId: formatChatId(telefone),
-    file: buildFileObj(videoUrl),
+async function enviarVideo(sessao, telefone, videoUrl, legenda = '') {
+  const api = await apiFor(sessao);
+  const isLocal = videoUrl && !videoUrl.startsWith('http');
+  const response = await api.post(`/api/${sessao}/send-file-base64`, {
+    phone: formatPhone(telefone),
+    base64: isLocal ? toDataUri(videoUrl) : videoUrl,
+    filename: path.basename(videoUrl || 'video.mp4'),
     caption: legenda,
-    session: instancia,
   });
   return response.data;
 }
 
 // Enviar documento/PDF
-async function enviarDocumento(instancia, telefone, docUrl, nomeArquivo = 'documento.pdf') {
-  const response = await api.post('/api/sendFile', {
-    chatId: formatChatId(telefone),
-    file: buildFileObj(docUrl, nomeArquivo),
-    session: instancia,
+async function enviarDocumento(sessao, telefone, docUrl, nomeArquivo = 'documento.pdf') {
+  const api = await apiFor(sessao);
+  const isLocal = docUrl && !docUrl.startsWith('http');
+  const response = await api.post(`/api/${sessao}/send-file-base64`, {
+    phone: formatPhone(telefone),
+    base64: isLocal ? toDataUri(docUrl) : docUrl,
+    filename: nomeArquivo || path.basename(docUrl),
+    caption: '',
   });
   return response.data;
 }
 
-// Enviar botões como texto (WAHA não tem botões nativos no NOWEB)
-async function enviarBotoes(instancia, telefone, titulo, mensagem, botoes) {
+// Enviar botões como texto
+async function enviarBotoes(sessao, telefone, titulo, mensagem, botoes) {
   const opcoes = botoes.map((b, i) => `${i + 1}. ${b.texto}`).join('\n');
-  return enviarTexto(instancia, telefone, `${mensagem}\n\n${opcoes}`);
+  return enviarTexto(sessao, telefone, `${mensagem}\n\n${opcoes}`);
 }
 
-// Verificar status da instância
-async function verificarStatus(instancia) {
+// Verificar status da sessão
+async function verificarStatus(sessao) {
   try {
-    const response = await api.get(`/api/sessions/${instancia}`);
+    const api = await apiFor(sessao);
+    const response = await api.get(`/api/${sessao}/status-session`);
     const status = response.data?.status;
-    const state = status === 'WORKING' ? 'open' : 'close';
-    return { instance: { instanceName: instancia, state }, state };
+    const state = status === 'CONNECTED' ? 'open' : 'close';
+    return { instance: { instanceName: sessao, state }, state };
   } catch {
-    return { instance: { instanceName: instancia, state: 'close' }, state: 'close' };
+    return { instance: { instanceName: sessao, state: 'close' }, state: 'close' };
   }
 }
 
-// Criar instância/sessão
-async function criarInstancia(nomeInstancia) {
+// Criar/iniciar sessão
+async function criarInstancia(nomeSessao) {
   try {
-    const response = await api.post('/api/sessions', { name: nomeInstancia });
+    const token = await getToken(nomeSessao);
+    const api = axios.create({
+      baseURL: BASE_URL,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      timeout: 30000,
+    });
+    const response = await api.post(`/api/${nomeSessao}/start-session`, {
+      webhook: null,
+      waitQrCode: false,
+    });
     return response.data;
   } catch (err) {
     if (err.response?.status === 422 || err.response?.status === 409) {
-      return { name: nomeInstancia };
+      return { session: nomeSessao };
     }
     throw err;
   }
 }
 
-// Gerar QR Code para conectar
-async function gerarQRCode(instancia) {
-  await criarInstancia(instancia).catch(() => {});
-
-  try {
-    const response = await api.get(`/api/${instancia}/auth/qr`, {
-      params: { format: 'image' },
-      responseType: 'arraybuffer',
-    });
-    const base64 = `data:image/png;base64,${Buffer.from(response.data).toString('base64')}`;
-    return { base64 };
-  } catch {
-    const response = await api.get(`/api/${instancia}/auth/qr`);
-    return { base64: response.data?.value || response.data?.qr || null };
-  }
+// Gerar QR Code
+async function gerarQRCode(sessao) {
+  await criarInstancia(sessao).catch(() => {});
+  const api = await apiFor(sessao);
+  const response = await api.get(`/api/${sessao}/qrcode-session`);
+  const base64 = response.data?.base64 || response.data?.qrcode || null;
+  return { base64 };
 }
 
-// Gerar código de pareamento por número
-async function gerarPairingCode(instancia, telefone) {
-  await criarInstancia(instancia).catch(() => {});
-  const response = await api.post(`/api/${instancia}/auth/request-code`, {
-    phoneNumber: telefone.replace(/\D/g, ''),
-  });
-  return { code: response.data?.code };
+// Gerar código de pareamento
+async function gerarPairingCode(sessao, telefone) {
+  // WPPConnect não suporta pairing code nativamente - fallback para QR
+  return gerarQRCode(sessao);
 }
 
-// Deletar instância
-async function deletarInstancia(instancia) {
-  if (!instancia) return;
+// Deletar sessão
+async function deletarInstancia(sessao) {
+  if (!sessao) return;
   try {
-    const response = await api.delete(`/api/sessions/${instancia}`);
+    const api = await apiFor(sessao);
+    const response = await api.post(`/api/${sessao}/close-session`);
+    delete tokenCache[sessao];
     return response.data;
   } catch {
     return null;
   }
 }
 
-// Configurar webhook da instância
-async function configurarWebhook(instancia, webhookUrl) {
+// Configurar webhook
+async function configurarWebhook(sessao, webhookUrl) {
   try {
-    const response = await api.put(`/api/sessions/${instancia}`, {
-      config: {
-        webhooks: [{
-          url: webhookUrl,
-          events: ['message', 'message.ack', 'session.status'],
-        }],
+    const api = await apiFor(sessao);
+    await api.post(`/api/${sessao}/start-session`, {
+      webhook: {
+        url: webhookUrl,
+        autoDownload: false,
+        readMessage: true,
+        listenAcks: true,
       },
+      waitQrCode: false,
     });
-    return response.data;
+    return { ok: true };
   } catch {
     return { ok: true };
   }
 }
 
-// Baixar mídia de uma mensagem
-async function baixarMidia(instancia, messageId) {
-  try {
-    const response = await api.get(`/api/messages/${messageId}/download`, {
-      params: { session: instancia },
-    });
-    return response.data;
-  } catch {
-    return null;
-  }
+// Baixar mídia (não disponível diretamente no WPPConnect)
+async function baixarMidia(sessao, messageId) {
+  return null;
 }
 
 // Buscar foto de perfil
-async function buscarFotoPerfil(instancia, telefone) {
+async function buscarFotoPerfil(sessao, telefone) {
   try {
-    const response = await api.get('/api/contacts/profile-picture', {
-      params: { contactId: formatChatId(telefone), session: instancia },
+    const api = await apiFor(sessao);
+    const response = await api.get(`/api/${sessao}/profile-pic`, {
+      params: { phone: formatPhone(telefone) },
     });
-    return response.data?.profilePictureUrl || response.data?.url || null;
+    return response.data?.profilePic || null;
   } catch {
     return null;
   }
@@ -212,5 +245,5 @@ module.exports = {
   configurarWebhook,
   baixarMidia,
   buscarFotoPerfil,
-  formatChatId,
+  formatChatId: formatPhone,
 };

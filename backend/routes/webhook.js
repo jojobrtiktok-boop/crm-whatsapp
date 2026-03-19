@@ -34,6 +34,17 @@ router.post('/evolution', async (req, res) => {
       const state = evento.payload.status === 'WORKING' ? 'open' : 'close';
       emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' });
 
+    // === Formato WPPConnect ===
+    } else if (evento.event === 'onmessage' && evento.data) {
+      if (!evento.data.fromMe) {
+        await processarMensagemWPP(evento.data, instancia);
+      }
+    } else if (evento.event === 'onack' && evento.data) {
+      await processarReciboWPP(evento.data);
+    } else if (evento.event === 'onstatechange') {
+      const state = evento.data === 'CONNECTED' ? 'open' : 'close';
+      emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' });
+
     // === Formato Evolution API (compatibilidade) ===
     } else if (evento.event === 'messages.upsert' || evento.data?.message) {
       await processarMensagem(evento, instancia);
@@ -312,6 +323,122 @@ async function processarConexao(evento, instancia) {
     instancia,
     status: state === 'open' ? 'online' : 'offline',
   });
+}
+
+// ─── WPPConnect: Processa mensagem recebida ──────────────────────────────────
+async function processarMensagemWPP(data, instancia) {
+  const from = data.from || data.author || '';
+
+  // Pular grupos, status e mensagens próprias
+  if (from.includes('@g.us') || from.includes('status') || data.isGroupMsg) return;
+
+  // Extrair telefone
+  let telefone;
+  if (from.includes('@c.us')) {
+    telefone = from.replace('@c.us', '');
+  } else {
+    telefone = from; // @lid ou outro formato
+  }
+
+  if (!telefone) return;
+
+  // Verificar blacklist
+  const bloqueado = await prisma.blacklist.findUnique({ where: { telefone } });
+  if (bloqueado) return;
+
+  // Buscar chip
+  const chip = await buscarChipPorInstancia(instancia);
+  if (!chip) {
+    console.log(`[Webhook] Chip não encontrado para sessão: ${instancia}`);
+    return;
+  }
+
+  // Buscar ou criar cliente
+  const nome = data.notifyName || data.chat?.contact?.name || null;
+  let isNovo = false;
+  let cliente = await prisma.cliente.findUnique({ where: { telefone } });
+  if (!cliente) {
+    try {
+      cliente = await prisma.cliente.create({
+        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo' },
+      });
+      isNovo = true;
+    } catch {
+      cliente = await prisma.cliente.findUnique({ where: { telefone } });
+    }
+  } else if (nome && !cliente.nome) {
+    cliente = await prisma.cliente.update({ where: { id: cliente.id }, data: { nome } });
+  }
+  if (!cliente) return;
+  if (isNovo) {
+    console.log(`[Webhook] Novo lead WPP: ${telefone} (${cliente.nome || 'sem nome'})`);
+    emitir('lead:novo', cliente);
+  }
+
+  // Extrair conteúdo e tipo de mídia
+  let conteudo = data.body || data.caption || '';
+  let tipoMidia = null;
+  if (data.hasMedia || data.type !== 'chat') {
+    if (data.type === 'image') tipoMidia = 'imagem';
+    else if (data.type === 'audio' || data.type === 'ptt') tipoMidia = 'audio';
+    else if (data.type === 'video') tipoMidia = 'video';
+    else if (data.type === 'document') tipoMidia = 'documento';
+  }
+
+  // Baixar mídia recebida se disponível
+  let midiaUrl = null;
+  const mediaUrl = data.mediaData?.url || data.clientUrl || null;
+  if (tipoMidia && mediaUrl) {
+    try {
+      const mediaResp = await axios.get(mediaUrl, { responseType: 'arraybuffer', timeout: 15000 });
+      const ext = tipoMidia === 'imagem' ? 'jpg' : tipoMidia === 'audio' ? 'ogg' : tipoMidia === 'video' ? 'mp4' : 'bin';
+      const nomeArq = `recebido_${cliente.id}_${Date.now()}.${ext}`;
+      const dirMidia = path.join(config.upload.path, 'recebidos');
+      fs.mkdirSync(dirMidia, { recursive: true });
+      fs.writeFileSync(path.join(dirMidia, nomeArq), Buffer.from(mediaResp.data));
+      midiaUrl = `/uploads/recebidos/${nomeArq}`;
+    } catch (e) {
+      console.error('[Webhook] Erro ao baixar mídia WPP:', e.message);
+    }
+  }
+
+  // Salvar conversa
+  const conversa = await prisma.conversa.create({
+    data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia, midiaUrl },
+  });
+
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
+
+  // Processar no funil
+  await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
+
+  const execucaoAtiva = await prisma.funilExecucao.findFirst({
+    where: { clienteId: cliente.id, status: 'ativo' },
+  });
+  if (!execucaoAtiva && cliente.status === 'novo') {
+    await iniciarFunil(cliente.id, chip.id);
+  }
+}
+
+// ─── WPPConnect: Processa recibo de leitura ──────────────────────────────────
+async function processarReciboWPP(data) {
+  try {
+    const msgId = data.id;
+    const ack = data.ack;
+    let novoStatus = null;
+    if (ack >= 3) novoStatus = 'lido';
+    else if (ack === 2) novoStatus = 'entregue';
+
+    if (novoStatus && msgId) {
+      const conversa = await prisma.conversa.findFirst({ where: { wamid: msgId } });
+      if (conversa) {
+        await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
+        emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
+      }
+    }
+  } catch (err) {
+    console.error('[Webhook] Erro ao processar recibo WPP:', err.message);
+  }
 }
 
 module.exports = router;
