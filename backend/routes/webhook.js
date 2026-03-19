@@ -112,6 +112,22 @@ async function processarMensagemWaha(payload, instancia) {
     else if (tipo === 'document') tipoMidia = 'documento';
   }
 
+  // Baixar mídia recebida e salvar localmente
+  let midiaUrl = null;
+  if (tipoMidia && payload.media?.url) {
+    try {
+      const mediaResp = await axios.get(payload.media.url, { responseType: 'arraybuffer', timeout: 15000 });
+      const ext = tipoMidia === 'imagem' ? 'jpg' : tipoMidia === 'audio' ? 'ogg' : tipoMidia === 'video' ? 'mp4' : 'bin';
+      const nomeArq = `recebido_${cliente.id}_${Date.now()}.${ext}`;
+      const dirMidia = path.join(config.upload.path, 'recebidos');
+      fs.mkdirSync(dirMidia, { recursive: true });
+      fs.writeFileSync(path.join(dirMidia, nomeArq), Buffer.from(mediaResp.data));
+      midiaUrl = `/uploads/recebidos/${nomeArq}`;
+    } catch (e) {
+      console.error('[Webhook] Erro ao baixar mídia recebida:', e.message);
+    }
+  }
+
   // Salvar conversa
   const conversa = await prisma.conversa.create({
     data: {
@@ -120,6 +136,7 @@ async function processarMensagemWaha(payload, instancia) {
       tipo: 'recebida',
       conteudo,
       tipoMidia,
+      midiaUrl,
     },
   });
 
