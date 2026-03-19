@@ -95,6 +95,21 @@ async function gerarQRCode(instancia) {
   return response.data;
 }
 
+// Gerar codigo de pareamento via numero de telefone
+async function gerarPairingCode(instancia, telefone) {
+  const response = await api.post(`/instance/pairingCode/${instancia}`, {
+    phoneNumber: telefone,
+  });
+  return response.data;
+}
+
+// Deletar instancia
+async function deletarInstancia(instancia) {
+  if (!instancia) return;
+  const response = await api.delete(`/instance/delete/${instancia}`);
+  return response.data;
+}
+
 // Configurar webhook da instância
 async function configurarWebhook(instancia, webhookUrl) {
   const response = await api.post(`/webhook/set/${instancia}`, {
@@ -125,6 +140,8 @@ module.exports = {
   verificarStatus,
   criarInstancia,
   gerarQRCode,
+  gerarPairingCode,
+  deletarInstancia,
   configurarWebhook,
   baixarMidia,
 };

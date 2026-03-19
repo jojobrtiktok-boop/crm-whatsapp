@@ -41,33 +41,35 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/chips - Criar novo chip (cria instancia na Evolution API)
+// POST /api/chips - Criar novo chip (só nome obrigatório)
 router.post('/', async (req, res, next) => {
   try {
-    const { nome, numero } = req.body;
+    const { nome } = req.body;
 
-    if (!nome || !numero) {
-      return res.status(400).json({ erro: 'Nome e numero sao obrigatorios' });
+    if (!nome) {
+      return res.status(400).json({ erro: 'Nome é obrigatorio' });
     }
 
-    // Gerar nome da instancia a partir do nome do chip
-    const instanciaEvolution = nome.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+    // Gerar nome único da instancia
+    const base = nome.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const instanciaEvolution = `${base}-${Date.now()}`;
 
     // Criar instancia na Evolution API
+    let erroEvolution = null;
     try {
       await evolutionApi.criarInstancia(instanciaEvolution);
+      console.log(`[Chips] Instancia criada: ${instanciaEvolution}`);
     } catch (err) {
-      if (!err.response || err.response.status !== 409) {
-        console.error('Erro ao criar instancia Evolution:', err.response?.data || err.message);
-      }
+      erroEvolution = err.response?.data || err.message;
+      console.error('Erro ao criar instancia Evolution:', erroEvolution);
     }
 
-    // Salvar chip no banco
+    // Salvar chip no banco mesmo se Evolution falhar
     const chip = await prisma.chip.create({
-      data: { nome, numero, instanciaEvolution },
+      data: { nome, numero: '', instanciaEvolution },
     });
 
-    res.status(201).json(chip);
+    res.status(201).json({ ...chip, erroEvolution });
   } catch (err) {
     next(err);
   }
@@ -84,19 +86,52 @@ router.get('/:id/qrcode', async (req, res, next) => {
       return res.status(404).json({ erro: 'Chip nao encontrado' });
     }
 
-    // Tentar criar instancia primeiro (caso nao exista)
-    try {
-      await evolutionApi.criarInstancia(chip.instanciaEvolution);
-    } catch {
-      // Instancia ja existe, ok
+    // Verificar se ja esta conectado
+    const statusAtual = await evolutionApi.verificarStatus(chip.instanciaEvolution);
+    const state = statusAtual?.state || statusAtual?.instance?.state;
+    if (state === 'open' || state === 'connected') {
+      return res.json({ conectado: true, state });
     }
 
     // Gerar QR Code
     const resultado = await evolutionApi.gerarQRCode(chip.instanciaEvolution);
-    res.json(resultado);
+    console.log('[QR] Resposta Evolution:', JSON.stringify(resultado).substring(0, 200));
+
+    // Normalizar resposta - Evolution pode retornar em formatos diferentes
+    const base64 = resultado?.base64 || resultado?.qrcode?.base64 || resultado?.code;
+    const pairingCode = resultado?.pairingCode;
+
+    res.json({ base64, pairingCode, raw: resultado });
   } catch (err) {
     console.error('Erro ao gerar QR Code:', err.response?.data || err.message);
     res.status(500).json({ erro: 'Erro ao gerar QR Code', detalhe: err.response?.data || err.message });
+  }
+});
+
+// POST /api/chips/:id/pairingcode - Gerar codigo de pareamento por numero
+router.post('/:id/pairingcode', async (req, res, next) => {
+  try {
+    const chip = await prisma.chip.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+
+    if (!chip) {
+      return res.status(404).json({ erro: 'Chip nao encontrado' });
+    }
+
+    const { telefone } = req.body;
+    if (!telefone) {
+      return res.status(400).json({ erro: 'Telefone obrigatorio' });
+    }
+
+    const resultado = await evolutionApi.gerarPairingCode(chip.instanciaEvolution, telefone);
+    console.log('[PairingCode] Resposta Evolution:', JSON.stringify(resultado));
+
+    const code = resultado?.code || resultado?.pairingCode;
+    res.json({ code, raw: resultado });
+  } catch (err) {
+    console.error('Erro ao gerar pairing code:', err.response?.data || err.message);
+    res.status(500).json({ erro: 'Erro ao gerar codigo', detalhe: err.response?.data || err.message });
   }
 });
 
@@ -176,14 +211,16 @@ router.delete('/:id', async (req, res, next) => {
     // Remover conversas vinculadas
     await prisma.conversa.deleteMany({ where: { chipId } });
 
+    // Buscar instancia antes de deletar
+    const chipParaDeletar = await prisma.chip.findUnique({ where: { id: chipId } });
+    const instancia = chipParaDeletar?.instanciaEvolution;
+
     // Deletar chip
     await prisma.chip.delete({ where: { id: chipId } });
 
     // Tentar deletar instancia na Evolution API
     try {
-      await evolutionApi.deletarInstancia(
-        (await prisma.chip.findUnique({ where: { id: chipId } }))?.instanciaEvolution
-      );
+      if (instancia) await evolutionApi.deletarInstancia(instancia);
     } catch {}
 
     res.json({ mensagem: 'Chip removido com sucesso' });
