@@ -24,14 +24,15 @@ router.get('/', async (req, res, next) => {
 router.put('/', async (req, res, next) => {
   try {
     const configs = req.body;
-
     const contaId = req.usuario.contaId;
+
     for (const [chave, valor] of Object.entries(configs)) {
-      await prisma.configuracao.upsert({
-        where: { chave_contaId: { chave, contaId } },
-        update: { valor: String(valor) },
-        create: { chave, contaId, valor: String(valor) },
-      });
+      const existente = await prisma.configuracao.findFirst({ where: { chave, contaId } });
+      if (existente) {
+        await prisma.configuracao.update({ where: { id: existente.id }, data: { valor: String(valor) } });
+      } else {
+        await prisma.configuracao.create({ data: { chave, contaId, valor: String(valor) } });
+      }
     }
 
     res.json({ mensagem: 'Configurações atualizadas' });
