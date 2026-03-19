@@ -10,6 +10,7 @@ const prisma = new PrismaClient();
 async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEvolution, telefoneCliente, textoPDF }) {
   console.log(`[Comprovante] Analisando imagem/documento para cliente ${clienteId}, chip ${chipId}`);
 
+  let comprovante = null;
   try {
     // Analisar com Claude Vision (imagem) ou texto (PDF)
     let dados;
@@ -29,7 +30,7 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
     console.log('[Comprovante] Comprovante detectado! Processando...');
 
     // Criar registro do comprovante
-    const comprovante = await prisma.comprovante.create({
+    comprovante = await prisma.comprovante.create({
       data: {
         clienteId,
         chipId,
@@ -103,15 +104,30 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         data: { status: 'comprou' },
       });
 
-      // Enviar mensagem de confirmação
-      const msgConfirmacao = `Pagamento confirmado! ✅\nValor: R$ ${dados.valor?.toFixed(2) || 'N/A'}\nObrigado pela compra!`;
+      // Enviar mensagem de confirmação e salvar no histórico
+      const valorStr = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : 'N/A';
+      const msgConfirmacao = `✅ Pagamento confirmado!\nValor: ${valorStr}\nObrigado pela compra! 🙏`;
       try {
+        const chip = await prisma.chip.findUnique({ where: { id: chipId } });
         await enviarTexto(instanciaEvolution, telefoneCliente, msgConfirmacao);
+        // Salvar mensagem de confirmação no histórico
+        const conversaConf = await prisma.conversa.create({
+          data: { clienteId, chipId, tipo: 'enviada', conteudo: msgConfirmacao, status: 'enviado' },
+        });
+        emitir('mensagem:nova', { conversa: conversaConf, clienteId, chipId });
       } catch (err) {
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
       }
     } else {
-      // Alertar operador sobre divergência
+      // Avisar operador sobre divergência de valor
+      const msgDivergencia = `⚠️ Comprovante recebido mas valor divergente.\nValor no comprovante: R$ ${dados.valor?.toFixed(2) || 'N/A'}\nPor favor, entre em contato conosco.`;
+      try {
+        await enviarTexto(instanciaEvolution, telefoneCliente, msgDivergencia);
+        const conversaDiv = await prisma.conversa.create({
+          data: { clienteId, chipId, tipo: 'enviada', conteudo: msgDivergencia, status: 'enviado' },
+        });
+        emitir('mensagem:nova', { conversa: conversaDiv, clienteId, chipId });
+      } catch {}
       console.log('[Comprovante] Divergência detectada - alertando operador');
     }
 
@@ -127,18 +143,18 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
   } catch (err) {
     console.error('[Comprovante] Erro na análise:', err.message);
 
-    // Marcar como divergente em caso de erro
-    await prisma.comprovante.update({
-      where: { id: comprovante.id },
-      data: { status: 'divergente', dadosBrutosIA: { erro: err.message } },
-    });
-
-    emitir('comprovante:analisado', {
-      comprovanteId: comprovante.id,
-      clienteId,
-      status: 'divergente',
-      erro: err.message,
-    });
+    if (comprovante) {
+      await prisma.comprovante.update({
+        where: { id: comprovante.id },
+        data: { status: 'divergente', dadosBrutosIA: { erro: err.message } },
+      }).catch(() => {});
+      emitir('comprovante:analisado', {
+        comprovanteId: comprovante.id,
+        clienteId,
+        status: 'divergente',
+        erro: err.message,
+      });
+    }
 
     return { status: 'divergente', erro: err.message };
   }

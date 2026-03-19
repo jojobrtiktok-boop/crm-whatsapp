@@ -415,6 +415,18 @@ async function processarMensagemWPP(data, instancia) {
 
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
 
+  // Analisar imagem com IA (possível comprovante de pagamento)
+  if (tipoMidia === 'imagem' && midiaUrl) {
+    const imagemPathAbs = path.join(__dirname, '..', '..', midiaUrl);
+    await comprovanteQueue.add({
+      clienteId: cliente.id,
+      chipId: chip.id,
+      imagemPath: imagemPathAbs,
+      instanciaEvolution: instancia,
+      telefoneCliente: cliente.telefone,
+    });
+  }
+
   // Processar no funil
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
 

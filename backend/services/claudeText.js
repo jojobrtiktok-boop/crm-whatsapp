@@ -16,7 +16,7 @@ async function variarMensagem(mensagemBase, tom, contexto, nomeCliente) {
   const instrucaoTom = tons[tom] || tons.informal;
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 500,
     messages: [
       {

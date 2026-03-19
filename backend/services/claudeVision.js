@@ -20,7 +20,7 @@ async function analisarImagem(imagemPath) {
   const mediaType = mimeTypes[extensao] || 'image/jpeg';
 
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 1024,
     messages: [
       {
@@ -75,7 +75,7 @@ Retorne APENAS o JSON, sem texto adicional.`,
 // Analisa texto extraído de PDF para detectar comprovante
 async function analisarTextoPDF(texto) {
   const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 1024,
     messages: [
       {
