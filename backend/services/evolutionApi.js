@@ -190,8 +190,22 @@ async function gerarQRCode(sessao) {
 
 // Gerar código de pareamento
 async function gerarPairingCode(sessao, telefone) {
-  // WPPConnect não suporta pairing code nativamente - fallback para QR
-  return gerarQRCode(sessao);
+  const token = await getToken(sessao);
+  const api = axios.create({
+    baseURL: BASE_URL,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    timeout: 30000,
+  });
+
+  // Garantir que a sessão está iniciada
+  await api.post(`/api/${sessao}/start-session`, { webhook: null, waitQrCode: false }).catch(() => {});
+
+  // Solicitar pairing code (o endpoint espera a sessão entrar em QRCODE)
+  const response = await api.post(`/api/${sessao}/request-pairing-code`, {
+    phone: telefone.replace(/\D/g, ''),
+  });
+  const code = response.data?.code;
+  return { code };
 }
 
 // Deletar sessão

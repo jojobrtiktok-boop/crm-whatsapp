@@ -119,6 +119,47 @@ app.get('/api/:session/qrcode-session', verifyToken, (req, res) => {
   res.json({ status: 'QRCODE', base64: sess.qrBase64 });
 });
 
+// Pairing code (código de pareamento por número de telefone)
+app.post('/api/:session/request-pairing-code', verifyToken, async (req, res) => {
+  const { session } = req.params;
+  const { phone } = req.body;
+  const sess = sessions[session];
+
+  if (!phone) {
+    return res.status(400).json({ error: 'phone is required' });
+  }
+
+  // Iniciar sessão se necessário
+  if (!sess?.socket || sess.status === 'CLOSED') {
+    if (!sess) sessions[session] = { status: 'CLOSED', qrBase64: null, webhookUrl: null, socket: null, token: sessions[session]?.token };
+    startBaileysSession(session).catch(() => {});
+  }
+
+  // Aguardar socket estar pronto (até 15s)
+  for (let i = 0; i < 30; i++) {
+    if (sessions[session]?.socket && sessions[session]?.status === 'QRCODE') break;
+    if (sessions[session]?.status === 'CONNECTED') {
+      return res.status(400).json({ error: 'Session already connected' });
+    }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+
+  const currentSess = sessions[session];
+  if (!currentSess?.socket || currentSess.status !== 'QRCODE') {
+    return res.status(503).json({ error: 'Session not ready for pairing. Try again in a few seconds.' });
+  }
+
+  try {
+    const phoneClean = phone.replace(/\D/g, '');
+    const code = await currentSess.socket.requestPairingCode(phoneClean);
+    console.log(`[${session}] Pairing code gerado para ${phoneClean}`);
+    res.json({ code });
+  } catch (err) {
+    console.error(`[${session}] Erro ao gerar pairing code:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Fechar sessão
 app.post('/api/:session/close-session', verifyToken, async (req, res) => {
   const { session } = req.params;
