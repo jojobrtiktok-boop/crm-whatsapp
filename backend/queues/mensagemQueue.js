@@ -74,7 +74,8 @@ mensagemQueue.process(async (job) => {
     }
     // Emitir status atualizado
     const { emitir } = require('../services/socketManager');
-    emitir('mensagem:status', { conversaId, status: 'enviado', wamid: resultado?.key?.id || resultado?.id });
+    const conversaParaEmit = await prisma.conversa.findUnique({ where: { id: conversaId }, include: { chip: true } });
+    emitir('mensagem:status', { conversaId, status: 'enviado', wamid: resultado?.key?.id || resultado?.id }, conversaParaEmit?.chip?.contaId);
   }
 });
 
@@ -92,8 +93,8 @@ mensagemQueue.on('failed', async (job, err) => {
         data: { status: 'erro' },
       });
       const { emitir } = require('../services/socketManager');
-      const conversa = await prisma.conversa.findUnique({ where: { id: job.data.conversaId } });
-      if (conversa) emitir('mensagem:status', { conversaId: conversa.id, status: 'erro', clienteId: conversa.clienteId });
+      const conversa = await prisma.conversa.findUnique({ where: { id: job.data.conversaId }, include: { chip: true } });
+      if (conversa) emitir('mensagem:status', { conversaId: conversa.id, status: 'erro', clienteId: conversa.clienteId }, conversa.chip?.contaId);
     } catch {}
   }
 });

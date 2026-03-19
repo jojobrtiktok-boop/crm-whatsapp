@@ -11,6 +11,10 @@ const prisma = new PrismaClient();
 async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEvolution, telefoneCliente, textoPDF }) {
   console.log(`[Comprovante] Analisando imagem/documento para cliente ${clienteId}, chip ${chipId}`);
 
+  // Buscar chip para isolamento por conta
+  const chip = await prisma.chip.findUnique({ where: { id: chipId } });
+  const contaId = chip?.contaId || null;
+
   let comprovante = null;
   try {
     // Analisar com Claude Vision (imagem) ou texto (PDF)
@@ -112,13 +116,12 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       const msgFn = MSGS_CONFIRMACAO[idiomaCliente] || MSGS_CONFIRMACAO['pt'];
       const msgConfirmacao = msgFn(valorStr);
       try {
-        const chip = await prisma.chip.findUnique({ where: { id: chipId } });
         await enviarTexto(instanciaEvolution, telefoneCliente, msgConfirmacao);
         // Salvar mensagem de confirmação no histórico
         const conversaConf = await prisma.conversa.create({
           data: { clienteId, chipId, tipo: 'enviada', conteudo: msgConfirmacao, status: 'enviado' },
         });
-        emitir('mensagem:nova', { conversa: conversaConf, clienteId, chipId });
+        emitir('mensagem:nova', { conversa: conversaConf, clienteId, chipId }, contaId);
       } catch (err) {
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
       }
@@ -134,7 +137,7 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         const conversaDiv = await prisma.conversa.create({
           data: { clienteId, chipId, tipo: 'enviada', conteudo: msgDivergencia, status: 'enviado' },
         });
-        emitir('mensagem:nova', { conversa: conversaDiv, clienteId, chipId });
+        emitir('mensagem:nova', { conversa: conversaDiv, clienteId, chipId }, contaId);
       } catch {}
       console.log('[Comprovante] Divergência detectada - alertando operador');
     }
@@ -145,7 +148,7 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       clienteId,
       status: statusComprovante,
       dados,
-    });
+    }, contaId);
 
     return { status: statusComprovante, dados };
   } catch (err) {
@@ -161,7 +164,7 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         clienteId,
         status: 'divergente',
         erro: err.message,
-      });
+      }, contaId);
     }
 
     return { status: 'divergente', erro: err.message };

@@ -1,4 +1,4 @@
-// Gerenciador de conexões WebSocket
+// Gerenciador de conexões WebSocket com isolamento por conta
 let ioInstance = null;
 
 // Inicializa o Socket.io e configura eventos
@@ -6,7 +6,14 @@ function inicializarSocketManager(io) {
   ioInstance = io;
 
   io.on('connection', (socket) => {
-    console.log(`[Socket] Cliente conectado: ${socket.id}`);
+    // Colocar socket na sala da sua conta (contaId vem do frontend)
+    const contaId = socket.handshake.query.contaId;
+    if (contaId) {
+      socket.join(`conta:${contaId}`);
+      console.log(`[Socket] Cliente conectado: ${socket.id} (conta ${contaId})`);
+    } else {
+      console.log(`[Socket] Cliente conectado: ${socket.id} (sem conta)`);
+    }
 
     // Operador assume atendimento
     socket.on('atendimento:assumir', (data) => {
@@ -25,9 +32,12 @@ function inicializarSocketManager(io) {
   });
 }
 
-// Emite evento para todos os clientes conectados
-function emitir(evento, dados) {
-  if (ioInstance) {
+// Emite evento para a sala de uma conta específica (ou global se sem contaId)
+function emitir(evento, dados, contaId = null) {
+  if (!ioInstance) return;
+  if (contaId) {
+    ioInstance.to(`conta:${contaId}`).emit(evento, dados);
+  } else {
     ioInstance.emit(evento, dados);
   }
 }

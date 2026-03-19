@@ -32,7 +32,8 @@ router.post('/evolution', async (req, res) => {
       await processarReciboWaha(evento.payload);
     } else if (evento.event === 'session.status' && evento.payload) {
       const state = evento.payload.status === 'WORKING' ? 'open' : 'close';
-      emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' });
+      const chipStatus = await buscarChipPorInstancia(instancia);
+      emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' }, chipStatus?.contaId);
 
     // === Formato WPPConnect ===
     } else if (evento.event === 'onmessage' && evento.data) {
@@ -43,7 +44,8 @@ router.post('/evolution', async (req, res) => {
       await processarReciboWPP(evento.data);
     } else if (evento.event === 'onstatechange') {
       const state = evento.data === 'CONNECTED' ? 'open' : 'close';
-      emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' });
+      const chipStatusWpp = await buscarChipPorInstancia(instancia);
+      emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' }, chipStatusWpp?.contaId);
 
     // === Formato Evolution API (compatibilidade) ===
     } else if (evento.event === 'messages.upsert' || evento.data?.message) {
@@ -108,7 +110,7 @@ async function processarMensagemWaha(payload, instancia) {
   if (!cliente) return;
   if (isNovo) {
     console.log(`[Webhook] Novo lead: ${telefone} (${cliente.nome || 'sem nome'})`);
-    emitir('lead:novo', cliente);
+    emitir('lead:novo', cliente, chip.contaId);
   }
 
   // Extrair conteúdo
@@ -151,7 +153,7 @@ async function processarMensagemWaha(payload, instancia) {
     },
   });
 
-  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
   // Processar imagem (possível comprovante)
   if (tipoMidia === 'imagem' && payload.media?.url) {
@@ -185,7 +187,8 @@ async function processarReciboWaha(payload) {
       const conversa = await prisma.conversa.findFirst({ where: { wamid: msgId } });
       if (conversa) {
         await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
-        emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
+        const chipRecibo = await prisma.chip.findUnique({ where: { id: conversa.chipId } });
+        emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId }, chipRecibo?.contaId);
         console.log(`[Webhook] Recibo WAHA: msg ${msgId} → ${novoStatus}`);
       }
     }
@@ -258,7 +261,7 @@ async function processarMensagem(evento, instancia) {
     });
   }
   if (!cliente) return;
-  if (isNovo2) emitir('lead:novo', cliente);
+  if (isNovo2) emitir('lead:novo', cliente, chip.contaId);
 
   const msgData = mensagem.message || {};
   let conteudo = msgData.conversation
@@ -277,7 +280,7 @@ async function processarMensagem(evento, instancia) {
     data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia },
   });
 
-  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
 
@@ -307,7 +310,8 @@ async function processarRecibo(evento) {
         const conversa = await prisma.conversa.findFirst({ where: { wamid } });
         if (conversa) {
           await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
-          emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
+          const chipRecibo2 = await prisma.chip.findUnique({ where: { id: conversa.chipId } });
+          emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId }, chipRecibo2?.contaId);
         }
       }
     }
@@ -319,10 +323,11 @@ async function processarRecibo(evento) {
 // ─── Evolution API: Status de conexão ───────────────────────────────────────
 async function processarConexao(evento, instancia) {
   const state = evento.data?.state || evento.state;
+  const chipConn = await buscarChipPorInstancia(instancia);
   emitir('chip:status', {
     instancia,
     status: state === 'open' ? 'online' : 'offline',
-  });
+  }, chipConn?.contaId);
 }
 
 // ─── WPPConnect: Processa mensagem recebida ──────────────────────────────────
@@ -374,7 +379,7 @@ async function processarMensagemWPP(data, instancia) {
   if (!cliente) return;
   if (isNovo) {
     console.log(`[Webhook] Novo lead WPP: ${telefone} (${cliente.nome || 'sem nome'})`);
-    emitir('lead:novo', cliente);
+    emitir('lead:novo', cliente, chip.contaId);
   }
 
   // Extrair conteúdo e tipo de mídia
@@ -413,7 +418,7 @@ async function processarMensagemWPP(data, instancia) {
     data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia, midiaUrl },
   });
 
-  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
   // Analisar imagem com IA (possível comprovante de pagamento)
   if (tipoMidia === 'imagem' && midiaUrl) {
@@ -451,7 +456,8 @@ async function processarReciboWPP(data) {
       const conversa = await prisma.conversa.findFirst({ where: { wamid: msgId } });
       if (conversa) {
         await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
-        emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
+        const chipRecibo3 = await prisma.chip.findUnique({ where: { id: conversa.chipId } });
+        emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId }, chipRecibo3?.contaId);
       }
     }
   } catch (err) {

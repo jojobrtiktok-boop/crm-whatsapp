@@ -13,6 +13,7 @@ export function SocketProvider({ children }) {
 
     const socketInstance = io(window.location.origin, {
       transports: ['websocket', 'polling'],
+      query: { contaId: usuario.contaId },
     });
 
     socketInstance.on('connect', () => {
