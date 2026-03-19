@@ -50,10 +50,23 @@ async function apiFor(sessao) {
   });
 }
 
+// Diretório base de uploads (crm-whatsapp/uploads)
+const UPLOAD_BASE = path.resolve(__dirname, '..', '..', 'uploads');
+
+// Converte URL relativa de upload (/uploads/funil/...) para caminho absoluto no disco
+function resolveUploadPath(urlOrPath) {
+  if (!urlOrPath || urlOrPath.startsWith('http')) return urlOrPath;
+  if (urlOrPath.startsWith('/uploads/')) {
+    return path.join(UPLOAD_BASE, urlOrPath.replace('/uploads/', ''));
+  }
+  return urlOrPath; // já é caminho absoluto
+}
+
 // Converte arquivo local para base64 com data URI
 function toDataUri(filePath) {
-  const data = fs.readFileSync(filePath).toString('base64');
-  const mimetype = mime.lookup(filePath) || 'application/octet-stream';
+  const absPath = resolveUploadPath(filePath);
+  const data = fs.readFileSync(absPath).toString('base64');
+  const mimetype = mime.lookup(absPath) || 'application/octet-stream';
   return `data:${mimetype};base64,${data}`;
 }
 

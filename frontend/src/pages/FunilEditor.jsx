@@ -10,6 +10,10 @@ import {
   Panel,
   Handle,
   Position,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
+  useReactFlow,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -143,7 +147,35 @@ function BlocoNode({ data }) {
   );
 }
 
+// Edge com botão de deletar
+function DeletableEdge({ id, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd }) {
+  const { setEdges } = useReactFlow();
+  const [edgePath, labelX, labelY] = getBezierPath({ sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition });
+
+  return (
+    <>
+      <BaseEdge id={id} path={edgePath} style={style} markerEnd={markerEnd} />
+      <EdgeLabelRenderer>
+        <button
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            pointerEvents: 'all',
+            zIndex: 10,
+          }}
+          onClick={() => setEdges((eds) => eds.filter((e) => e.id !== id))}
+          className="bg-white border border-red-400 text-red-500 rounded-full w-5 h-5 text-xs flex items-center justify-center hover:bg-red-500 hover:text-white shadow-sm"
+          title="Remover conexão"
+        >
+          ×
+        </button>
+      </EdgeLabelRenderer>
+    </>
+  );
+}
+
 const nodeTypes = { blocoNode: BlocoNode };
+const edgeTypes = { deletable: DeletableEdge };
 
 export default function FunilEditor() {
   const { id } = useParams();
@@ -195,6 +227,7 @@ export default function FunilEditor() {
           source: con.source,
           target: con.target,
           sourceHandle: con.sourceHandle || null,
+          type: 'deletable',
           animated: true,
           style: { stroke: '#94a3b8' },
         }));
@@ -225,7 +258,7 @@ export default function FunilEditor() {
   }
 
   const onConnect = useCallback(
-    (params) => setEdges((eds) => addEdge({ ...params, animated: true, style: { stroke: '#94a3b8' } }, eds)),
+    (params) => setEdges((eds) => addEdge({ ...params, type: 'deletable', animated: true, style: { stroke: '#94a3b8' } }, eds)),
     [setEdges]
   );
 
@@ -260,6 +293,7 @@ export default function FunilEditor() {
           id: `edge-${Date.now()}`,
           source: ultimoBloco.id,
           target: novoId,
+          type: 'deletable',
           animated: true,
           style: { stroke: '#94a3b8' },
         };
@@ -385,6 +419,7 @@ export default function FunilEditor() {
           onConnect={onConnect}
           onNodeClick={onNodeClick}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           fitView
           deleteKeyCode="Delete"
         >

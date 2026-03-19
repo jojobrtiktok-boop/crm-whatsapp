@@ -25,7 +25,8 @@ app.use(express.json({ limit: '100mb' }));
 const SECRET_KEY = process.env.SECRET_KEY || 'THISISMYSECURETOKEN';
 const PORT = parseInt(process.env.PORT || '21465');
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, 'sessions');
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+// Salvar na pasta uploads do CRM para o webhook servir corretamente
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads', 'recebidos');
 
 fs.mkdirSync(AUTH_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -78,6 +79,10 @@ app.post('/api/:session/start-session', verifyToken, async (req, res) => {
   if (webhook?.url) {
     sess.webhookUrl = webhook.url;
     console.log(`[${session}] Webhook: ${webhook.url}`);
+    // Persistir webhook URL em disco para sobreviver a restarts
+    const webhookFile = path.join(AUTH_DIR, session, 'webhook.json');
+    fs.mkdirSync(path.join(AUTH_DIR, session), { recursive: true });
+    fs.writeFileSync(webhookFile, JSON.stringify({ url: webhook.url }));
   }
 
   if (sess.status === 'CONNECTED') {
@@ -344,7 +349,7 @@ async function startBaileysSession(sessionName) {
           fs.writeFileSync(savePath, mediaBuffer);
           payload.data.mimetype = mimeType;
           payload.data.filename = filename;
-          payload.data.mediaUrl = `/uploads/${filename}`;
+          payload.data.mediaUrl = `/uploads/recebidos/${filename}`;
         } catch (err) {
           console.error(`[${sessionName}] Erro ao baixar mídia:`, err.message);
         }
@@ -399,4 +404,30 @@ app.listen(PORT, () => {
   console.log(`🟢 Baileys WhatsApp Server rodando na porta ${PORT}`);
   console.log(`   Swagger-like: http://localhost:${PORT}/health`);
   console.log(`   SECRET_KEY: ${SECRET_KEY}`);
+
+  // Auto-reconectar sessões que têm credenciais salvas em disco
+  autoReconectarSessoes();
 });
+
+async function autoReconectarSessoes() {
+  if (!fs.existsSync(AUTH_DIR)) return;
+  const dirs = fs.readdirSync(AUTH_DIR).filter(d =>
+    fs.statSync(path.join(AUTH_DIR, d)).isDirectory()
+  );
+  for (const sessionName of dirs) {
+    const credsFile = path.join(AUTH_DIR, sessionName, 'creds.json');
+    if (!fs.existsSync(credsFile)) continue;
+    console.log(`[${sessionName}] Auto-reconectando sessão salva...`);
+    const token = crypto.randomBytes(32).toString('hex');
+    // Carregar webhook URL salvo em disco
+    let webhookUrl = null;
+    const webhookFile = path.join(AUTH_DIR, sessionName, 'webhook.json');
+    if (fs.existsSync(webhookFile)) {
+      try { webhookUrl = JSON.parse(fs.readFileSync(webhookFile)).url; } catch {}
+    }
+    sessions[sessionName] = { status: 'CLOSED', qrBase64: null, webhookUrl, socket: null, token };
+    startBaileysSession(sessionName).catch(err => {
+      console.error(`[${sessionName}] Erro na auto-reconexão:`, err.message);
+    });
+  }
+}

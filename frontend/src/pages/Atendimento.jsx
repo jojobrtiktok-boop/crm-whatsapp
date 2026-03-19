@@ -42,6 +42,14 @@ function MidiaBubble({ msg }) {
       </div>
     );
   }
+  if (msg.tipoMidia === 'audio' && url) {
+    return (
+      <div>
+        <audio src={url} controls className="max-w-[220px]" />
+        {msg.conteudo && <p className="text-xs mt-1">{msg.conteudo}</p>}
+      </div>
+    );
+  }
   if (msg.tipoMidia === 'documento' && url) {
     return (
       <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-2 underline">

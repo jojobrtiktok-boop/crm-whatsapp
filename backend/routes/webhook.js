@@ -336,6 +336,8 @@ async function processarMensagemWPP(data, instancia) {
   let telefone;
   if (from.includes('@c.us')) {
     telefone = from.replace('@c.us', '');
+  } else if (from.includes('@s.whatsapp.net')) {
+    telefone = from.replace('@s.whatsapp.net', '');
   } else {
     telefone = from; // @lid ou outro formato
   }
@@ -378,27 +380,31 @@ async function processarMensagemWPP(data, instancia) {
   // Extrair conteúdo e tipo de mídia
   let conteudo = data.body || data.caption || '';
   let tipoMidia = null;
-  if (data.hasMedia || data.type !== 'chat') {
-    if (data.type === 'image') tipoMidia = 'imagem';
-    else if (data.type === 'audio' || data.type === 'ptt') tipoMidia = 'audio';
-    else if (data.type === 'video') tipoMidia = 'video';
-    else if (data.type === 'document') tipoMidia = 'documento';
-  }
+  const tipo = data.type || '';
+  if (tipo === 'image' || tipo === 'imageMessage') tipoMidia = 'imagem';
+  else if (tipo === 'audio' || tipo === 'ptt' || tipo === 'audioMessage') tipoMidia = 'audio';
+  else if (tipo === 'video' || tipo === 'videoMessage') tipoMidia = 'video';
+  else if (tipo === 'document' || tipo === 'documentMessage') tipoMidia = 'documento';
 
-  // Baixar mídia recebida se disponível
+  // Mídia já salva pelo Baileys (data.mediaUrl) ou baixar de URL remota (WPPConnect)
   let midiaUrl = null;
-  const mediaUrl = data.mediaData?.url || data.clientUrl || null;
-  if (tipoMidia && mediaUrl) {
-    try {
-      const mediaResp = await axios.get(mediaUrl, { responseType: 'arraybuffer', timeout: 15000 });
-      const ext = tipoMidia === 'imagem' ? 'jpg' : tipoMidia === 'audio' ? 'ogg' : tipoMidia === 'video' ? 'mp4' : 'bin';
-      const nomeArq = `recebido_${cliente.id}_${Date.now()}.${ext}`;
-      const dirMidia = path.join(config.upload.path, 'recebidos');
-      fs.mkdirSync(dirMidia, { recursive: true });
-      fs.writeFileSync(path.join(dirMidia, nomeArq), Buffer.from(mediaResp.data));
-      midiaUrl = `/uploads/recebidos/${nomeArq}`;
-    } catch (e) {
-      console.error('[Webhook] Erro ao baixar mídia WPP:', e.message);
+  if (data.mediaUrl) {
+    // Baileys: arquivo já salvo localmente, mediaUrl é o caminho relativo
+    midiaUrl = data.mediaUrl;
+  } else {
+    const remoteUrl = data.mediaData?.url || data.clientUrl || null;
+    if (tipoMidia && remoteUrl) {
+      try {
+        const mediaResp = await axios.get(remoteUrl, { responseType: 'arraybuffer', timeout: 15000 });
+        const ext = tipoMidia === 'imagem' ? 'jpg' : tipoMidia === 'audio' ? 'ogg' : tipoMidia === 'video' ? 'mp4' : 'bin';
+        const nomeArq = `recebido_${cliente.id}_${Date.now()}.${ext}`;
+        const dirMidia = path.join(config.upload.path, 'recebidos');
+        fs.mkdirSync(dirMidia, { recursive: true });
+        fs.writeFileSync(path.join(dirMidia, nomeArq), Buffer.from(mediaResp.data));
+        midiaUrl = `/uploads/recebidos/${nomeArq}`;
+      } catch (e) {
+        console.error('[Webhook] Erro ao baixar mídia WPP:', e.message);
+      }
     }
   }
 

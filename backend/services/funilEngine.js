@@ -66,12 +66,13 @@ async function executarBloco(execucaoId, bloco, funil) {
   switch (bloco.type) {
     case 'texto': {
       const msg = bloco.data.mensagem.replace('{nome}', cliente.nome || 'amigo');
-      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId);
+      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId, cliente.id, chip.id);
       await avancarParaProximoBloco(execucaoId, bloco.id, funil);
       break;
     }
 
     case 'imagem': {
+      const conversaImagem = await criarConversa(cliente.id, chip.id, null, 'imagem', bloco.data.url || null);
       await mensagemQueue.add({
         tipo: 'imagem',
         instancia: chip.instanciaEvolution,
@@ -79,24 +80,28 @@ async function executarBloco(execucaoId, bloco, funil) {
         url: bloco.data.url,
         legenda: bloco.data.legenda || '',
         execucaoId,
+        conversaId: conversaImagem?.id,
       });
       await avancarParaProximoBloco(execucaoId, bloco.id, funil);
       break;
     }
 
     case 'audio': {
+      const conversaAudio = await criarConversa(cliente.id, chip.id, null, 'audio', bloco.data.url || null);
       await mensagemQueue.add({
         tipo: 'audio',
         instancia: chip.instanciaEvolution,
         telefone: cliente.telefone,
         url: bloco.data.url,
         execucaoId,
+        conversaId: conversaAudio?.id,
       });
       await avancarParaProximoBloco(execucaoId, bloco.id, funil);
       break;
     }
 
     case 'video': {
+      const conversaVideo = await criarConversa(cliente.id, chip.id, null, 'video', bloco.data.url || null);
       await mensagemQueue.add({
         tipo: 'video',
         instancia: chip.instanciaEvolution,
@@ -104,6 +109,7 @@ async function executarBloco(execucaoId, bloco, funil) {
         url: bloco.data.url,
         legenda: bloco.data.legenda || '',
         execucaoId,
+        conversaId: conversaVideo?.id,
       });
       await avancarParaProximoBloco(execucaoId, bloco.id, funil);
       break;
@@ -114,8 +120,24 @@ async function executarBloco(execucaoId, bloco, funil) {
       // Enviar mensagem com opções listadas como texto
       const opcoes = bloco.data.opcoes.map((o, i) => `${i + 1}. ${o.texto}`).join('\n');
       const msgCompleta = `${msg}\n\n${opcoes}`;
-      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msgCompleta, execucaoId);
+      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msgCompleta, execucaoId, cliente.id, chip.id);
       // Não avança - aguarda resposta do lead
+      break;
+    }
+
+    case 'esperar_resposta': {
+      // Pausa o funil - aguarda mensagem do lead
+      // Agenda job de timeout caso não responda
+      const { tempoTimeout, unidadeTimeout } = bloco.data;
+      let delayMs = (tempoTimeout || 30) * 60 * 1000;
+      if (unidadeTimeout === 'horas') delayMs = (tempoTimeout || 30) * 60 * 60 * 1000;
+      if (unidadeTimeout === 'segundos') delayMs = (tempoTimeout || 30) * 1000;
+
+      await mensagemQueue.add(
+        { tipo: 'timeout_esperar_resposta', execucaoId, blocoId: bloco.id },
+        { delay: delayMs, jobId: `timeout-${execucaoId}-${bloco.id}` }
+      );
+      console.log(`[Funil] Aguardando resposta de ${cliente.telefone} por ${tempoTimeout || 30} ${unidadeTimeout || 'minutos'}`);
       break;
     }
 
@@ -142,12 +164,12 @@ async function executarBloco(execucaoId, bloco, funil) {
       const { mensagemBase, tom, contexto } = bloco.data;
       try {
         const msgVariada = await variarMensagem(mensagemBase, tom, contexto, cliente.nome);
-        await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msgVariada, execucaoId);
+        await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msgVariada, execucaoId, cliente.id, chip.id);
       } catch (err) {
         console.error('[Funil] Erro na variação IA:', err.message);
         // Fallback: enviar mensagem original
         const msg = mensagemBase.replace('{nome}', cliente.nome || 'amigo');
-        await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId);
+        await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId, cliente.id, chip.id);
       }
       await avancarParaProximoBloco(execucaoId, bloco.id, funil);
       break;
@@ -156,7 +178,7 @@ async function executarBloco(execucaoId, bloco, funil) {
     case 'comprovante': {
       // Aguarda envio de imagem - processado no webhook
       const msg = bloco.data.mensagem || 'Envie o comprovante de pagamento para confirmarmos.';
-      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId);
+      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId, cliente.id, chip.id);
       break;
     }
 
@@ -175,7 +197,7 @@ async function executarBloco(execucaoId, bloco, funil) {
 
     case 'transferencia': {
       const msg = bloco.data.mensagem || 'Você será transferido para um atendente. Aguarde!';
-      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId);
+      await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId, cliente.id, chip.id);
 
       // Criar atendimento
       const atendimento = await prisma.atendimento.create({
@@ -301,17 +323,50 @@ async function processarRespostaFunil(clienteId, mensagem, tipoMidia) {
     return execucao;
   }
 
+  if (blocoAtual.type === 'esperar_resposta') {
+    // Qualquer resposta avança pelo handle "respondeu"
+    await avancarParaProximoBloco(execucao.id, blocoAtual.id, funil, 'respondeu');
+    return execucao;
+  }
+
   return null;
 }
 
+// Cria registro de conversa no banco e emite evento de socket
+async function criarConversa(clienteId, chipId, conteudo, tipoMidia = null, midiaUrl = null) {
+  try {
+    const conversa = await prisma.conversa.create({
+      data: {
+        clienteId,
+        chipId,
+        tipo: 'enviada',
+        conteudo,
+        tipoMidia,
+        midiaUrl,
+        status: 'enviado',
+      },
+    });
+    emitir('mensagem:nova', conversa);
+    return conversa;
+  } catch (err) {
+    console.error('[Funil] Erro ao criar conversa:', err.message);
+    return null;
+  }
+}
+
 // Agenda envio de mensagem na fila
-async function agendarMensagem(instancia, telefone, mensagem, execucaoId) {
+async function agendarMensagem(instancia, telefone, mensagem, execucaoId, clienteId, chipId) {
+  const conversa = clienteId && chipId
+    ? await criarConversa(clienteId, chipId, mensagem)
+    : null;
+
   await mensagemQueue.add({
     tipo: 'texto',
     instancia,
     telefone,
     mensagem,
     execucaoId,
+    conversaId: conversa?.id || null,
   });
 }
 

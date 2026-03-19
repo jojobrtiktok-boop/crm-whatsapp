@@ -23,6 +23,21 @@ mensagemQueue.process(async (job) => {
     return;
   }
 
+  // Timeout do bloco esperar_resposta
+  if (tipo === 'timeout_esperar_resposta') {
+    const { avancarParaProximoBloco } = require('../services/funilEngine');
+    const execucao = await prisma.funilExecucao.findUnique({
+      where: { id: execucaoId },
+      include: { funil: true },
+    });
+
+    // Só avança pelo timeout se o lead ainda estiver neste bloco (não respondeu)
+    if (execucao && execucao.status === 'ativo' && execucao.blocoAtualId === job.data.blocoId) {
+      await avancarParaProximoBloco(execucaoId, job.data.blocoId, execucao.funil, 'timeout');
+    }
+    return;
+  }
+
   // WAHA NOWEB suporta @lid nativamente - não ignorar mais
   console.log(`[MensagemQueue] Enviando ${tipo} para ${telefone} via ${instancia}`);
 
@@ -57,6 +72,9 @@ mensagemQueue.process(async (job) => {
         data: { wamid },
       });
     }
+    // Emitir status atualizado
+    const { emitir } = require('../services/socketManager');
+    emitir('mensagem:status', { conversaId, status: 'enviado', wamid: resultado?.key?.id || resultado?.id });
   }
 });
 
