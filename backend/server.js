@@ -16,13 +16,19 @@ const server = http.createServer(app);
 // Socket.io com CORS
 const io = new Server(server, {
   cors: {
-    origin: config.nodeEnv === 'development' ? '*' : undefined,
-    methods: ['GET', 'POST'],
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
   },
+  transports: ['polling', 'websocket'] 
 });
 
 // Middlewares globais
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ 
+  contentSecurityPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  crossOriginOpenerPolicy: false
+}));
 app.use(cors());
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));

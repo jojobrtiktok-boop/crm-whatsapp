@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
-    "@prisma/client": "^6.4.1",
+    "@prisma/client": "5.15.0",
     "axios": "^1.7.9",
     "bcryptjs": "^2.4.3",
     "bull": "^4.16.5",
@@ -30,6 +30,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.1.9",
-    "prisma": "^6.4.1"
+    "prisma": "5.15.0"
   }
 }
