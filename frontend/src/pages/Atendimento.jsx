@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, User, GitBranch, Play, Smartphone, Bot, HeadphonesIcon, Paperclip, Check, CheckCheck, FileText, Image, Video, X } from 'lucide-react';
+import { Send, User, GitBranch, Play, Smartphone, Bot, HeadphonesIcon, Paperclip, Check, CheckCheck, FileText, X, DollarSign } from 'lucide-react';
 import api from '../api';
 import { useSocket, useSocketEvent } from '../hooks/useSocket';
 
@@ -62,7 +62,9 @@ function MidiaBubble({ msg }) {
 }
 
 export default function Atendimento() {
+  const [aba, setAba] = useState('todos'); // 'todos' | 'pagos'
   const [leads, setLeads] = useState([]);
+  const [leadsPagos, setLeadsPagos] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
   const [conversas, setConversas] = useState([]);
   const [mensagem, setMensagem] = useState('');
@@ -78,14 +80,16 @@ export default function Atendimento() {
 
   async function carregarLeads() {
     try {
-      const [resLeads, resChips, resFunis] = await Promise.all([
+      const [resLeads, resChips, resFunis, resPagos] = await Promise.all([
         api.get('/atendimento'),
         api.get('/chips'),
         api.get('/funis'),
+        api.get('/atendimento/pagos'),
       ]);
       setLeads(resLeads.data);
       setChips(resChips.data);
       setFunis(resFunis.data);
+      setLeadsPagos(resPagos.data);
       resLeads.data.forEach((lead) => {
         api.get(`/clientes/${lead.id}/foto`).then((r) => {
           if (r.data?.url) setFotos((prev) => ({ ...prev, [lead.id]: r.data.url }));
@@ -219,13 +223,25 @@ export default function Atendimento() {
     <div className="h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-gray-200 overflow-hidden">
       {/* Lista de leads */}
       <div className="w-96 border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-800">Painel de Controle</h2>
-          <p className="text-xs text-gray-500 mt-1">{leads.length} conversas</p>
+        <div className="p-3 border-b border-gray-200">
+          <div className="flex rounded-lg overflow-hidden border border-gray-200">
+            <button
+              onClick={() => setAba('todos')}
+              className={`flex-1 py-1.5 text-xs font-medium ${aba === 'todos' ? 'bg-primary-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              Atendimento ({leads.length})
+            </button>
+            <button
+              onClick={() => setAba('pagos')}
+              className={`flex-1 py-1.5 text-xs font-medium flex items-center justify-center gap-1 ${aba === 'pagos' ? 'bg-green-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              <DollarSign size={11} /> Pagos ({leadsPagos.length})
+            </button>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {leads.map((lead) => (
+          {(aba === 'todos' ? leads : leadsPagos).map((lead) => (
             <div
               key={lead.id}
               onClick={() => selecionarLead(lead)}
@@ -244,11 +260,15 @@ export default function Atendimento() {
                   <p className="text-sm font-medium text-gray-800 truncate">
                     {lead.nome || lead.telefone}
                   </p>
-                  {lead.ultimaMensagem && (
+                  {aba === 'pagos' && lead.ultimoComprovante ? (
+                    <span className="text-[10px] font-bold text-green-600 shrink-0">
+                      R$ {lead.ultimoComprovante.valorExtraido?.toFixed(2) || '?'}
+                    </span>
+                  ) : lead.ultimaMensagem ? (
                     <span className="text-[10px] text-gray-400 shrink-0">
                       {formatarData(lead.ultimaMensagem.criadoEm)}
                     </span>
-                  )}
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
                   {lead.chipOrigem && (
@@ -257,29 +277,37 @@ export default function Atendimento() {
                       {lead.chipOrigem.nome || lead.chipOrigem.numero?.slice(-4)}
                     </span>
                   )}
-                  {lead.emFunil ? (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-md shrink-0">
-                      <Bot size={9} /> Bot
+                  {aba === 'pagos' && lead.ultimoComprovante ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md shrink-0">
+                      <DollarSign size={9} /> {lead.ultimoComprovante.banco || lead.ultimoComprovante.tipoTransferencia || 'Pago'}
                     </span>
-                  ) : lead.atendimento ? (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-md shrink-0">
-                      <HeadphonesIcon size={9} /> Humano
-                    </span>
-                  ) : null}
-                  {lead.ultimaMensagem && (
-                    <p className="text-xs text-gray-400 truncate">
-                      {lead.ultimaMensagem.conteudo || `[${lead.ultimaMensagem.tipoMidia}]`}
-                    </p>
+                  ) : (
+                    <>
+                      {lead.emFunil ? (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-md shrink-0">
+                          <Bot size={9} /> Bot
+                        </span>
+                      ) : lead.atendimento ? (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-md shrink-0">
+                          <HeadphonesIcon size={9} /> Humano
+                        </span>
+                      ) : null}
+                      {lead.ultimaMensagem && (
+                        <p className="text-xs text-gray-400 truncate">
+                          {lead.ultimaMensagem.conteudo || `[${lead.ultimaMensagem.tipoMidia}]`}
+                        </p>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
             </div>
           ))}
 
-          {leads.length === 0 && (
+          {(aba === 'todos' ? leads : leadsPagos).length === 0 && (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <User size={32} className="mb-2 opacity-50" />
-              <p className="text-sm">Nenhuma conversa ainda</p>
+              <p className="text-sm">{aba === 'pagos' ? 'Nenhum pagamento confirmado' : 'Nenhuma conversa ainda'}</p>
             </div>
           )}
         </div>

@@ -60,6 +60,59 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// GET /api/atendimento/pagos - Clientes com pagamento confirmado pela IA
+router.get('/pagos', async (req, res, next) => {
+  try {
+    const clientes = await prisma.cliente.findMany({
+      where: {
+        contaId: req.usuario.contaId,
+        comprovantes: { some: { status: 'confirmado' } },
+      },
+      include: {
+        chipOrigem: { select: { id: true, nome: true, numero: true } },
+        comprovantes: {
+          where: { status: 'confirmado' },
+          orderBy: { criadoEm: 'desc' },
+          take: 1,
+          select: { id: true, valorExtraido: true, criadoEm: true, banco: true, tipoTransferencia: true },
+        },
+        conversas: {
+          orderBy: { criadoEm: 'desc' },
+          take: 1,
+          select: { conteudo: true, criadoEm: true, tipo: true, tipoMidia: true },
+        },
+        atendimentos: {
+          where: { status: { not: 'finalizado' } },
+          take: 1,
+          select: { id: true, status: true },
+        },
+        execucoes: {
+          where: { status: 'ativo' },
+          take: 1,
+          select: { id: true },
+        },
+      },
+      orderBy: { atualizadoEm: 'desc' },
+    });
+
+    const resultado = clientes.map((l) => ({
+      id: l.id,
+      nome: l.nome,
+      telefone: l.telefone,
+      chipOrigem: l.chipOrigem,
+      chipOrigemId: l.chipOrigemId,
+      ultimaMensagem: l.conversas[0] || null,
+      ultimoComprovante: l.comprovantes[0] || null,
+      atendimento: l.atendimentos[0] || null,
+      emFunil: l.execucoes.length > 0,
+    }));
+
+    res.json(resultado);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // POST /api/atendimento - Criar atendimento (transferência do bot)
 router.post('/', async (req, res, next) => {
   try {

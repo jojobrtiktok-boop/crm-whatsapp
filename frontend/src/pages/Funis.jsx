@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, GitBranch, Copy, Trash2, ToggleLeft, ToggleRight, Edit2 } from 'lucide-react';
+import { Plus, GitBranch, Copy, Trash2, ToggleLeft, ToggleRight, Edit2, Pencil } from 'lucide-react';
 import api from '../api';
 
 export default function Funis() {
   const [funis, setFunis] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
   const [form, setForm] = useState({ nome: '', descricao: '' });
+  const [renomeando, setRenomeando] = useState(null); // { id, nome }
   const navigate = useNavigate();
 
   async function carregarFunis() {
@@ -49,6 +50,17 @@ export default function Funis() {
     }
   }
 
+  async function salvarNome() {
+    if (!renomeando?.nome.trim()) return;
+    try {
+      await api.put(`/funis/${renomeando.id}`, { nome: renomeando.nome.trim() });
+      setRenomeando(null);
+      carregarFunis();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao renomear');
+    }
+  }
+
   async function deletarFunil(id) {
     if (!confirm('Deseja realmente deletar este funil?')) return;
     try {
@@ -80,8 +92,29 @@ export default function Funis() {
                 <div className={`p-2 rounded-lg ${funil.ativo ? 'bg-green-100' : 'bg-gray-100'}`}>
                   <GitBranch className={funil.ativo ? 'text-green-600' : 'text-gray-400'} size={20} />
                 </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800">{funil.nome}</h3>
+                <div className="flex-1 min-w-0">
+                  {renomeando?.id === funil.id ? (
+                    <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        autoFocus
+                        value={renomeando.nome}
+                        onChange={(e) => setRenomeando({ ...renomeando, nome: e.target.value })}
+                        onKeyDown={(e) => { if (e.key === 'Enter') salvarNome(); if (e.key === 'Escape') setRenomeando(null); }}
+                        className="text-sm font-semibold border-b border-primary-400 bg-transparent outline-none w-full"
+                      />
+                      <button onClick={salvarNome} className="text-xs text-primary-600 font-medium shrink-0">OK</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 group">
+                      <h3 className="font-semibold text-gray-800 truncate">{funil.nome}</h3>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRenomeando({ id: funil.id, nome: funil.nome }); }}
+                        className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-primary-600"
+                      >
+                        <Pencil size={12} />
+                      </button>
+                    </div>
+                  )}
                   {funil.descricao && (
                     <p className="text-xs text-gray-500 mt-0.5">{funil.descricao}</p>
                   )}

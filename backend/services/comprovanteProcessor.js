@@ -1,4 +1,5 @@
 // Orquestrador: recebe imagem → analisa com IA → se for comprovante, registra venda
+const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { analisarImagem, analisarTextoPDF } = require('./claudeVision');
 const { emitir } = require('./socketManager');
@@ -10,6 +11,28 @@ const prisma = new PrismaClient();
 // Processa imagem recebida de um cliente (pode ou não ser comprovante)
 async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEvolution, telefoneCliente, textoPDF }) {
   console.log(`[Comprovante] Analisando imagem/documento para cliente ${clienteId}, chip ${chipId}`);
+
+  // Dedup: verificar se mesma imagem já foi processada para este cliente
+  let imageHash = null;
+  if (!textoPDF && imagemPath) {
+    try {
+      const buffer = fs.readFileSync(imagemPath);
+      imageHash = crypto.createHash('sha256').update(buffer).digest('hex');
+      const duplicado = await prisma.$queryRaw`
+        SELECT id FROM comprovantes
+        WHERE cliente_id = ${clienteId}
+        AND dados_brutos_ia IS NOT NULL
+        AND dados_brutos_ia->>'image_hash' = ${imageHash}
+        LIMIT 1
+      `;
+      if (duplicado.length > 0) {
+        console.log('[Comprovante] Imagem duplicada detectada, ignorando');
+        return { status: 'duplicado', descricao: 'Comprovante já processado anteriormente' };
+      }
+    } catch (e) {
+      console.error('[Comprovante] Erro no dedup:', e.message);
+    }
+  }
 
   // Buscar chip para isolamento por conta
   const chip = await prisma.chip.findUnique({ where: { id: chipId } });
@@ -77,7 +100,7 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         dataPagamento: dados.data_pagamento,
         banco: dados.banco,
         tipoTransferencia: dados.tipo_transferencia,
-        dadosBrutosIA: dados,
+        dadosBrutosIA: imageHash ? { ...dados, image_hash: imageHash } : dados,
         vendaId: vendaPendente?.id || null,
         status: statusComprovante,
       },

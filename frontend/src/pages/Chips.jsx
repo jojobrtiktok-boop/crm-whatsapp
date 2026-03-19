@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, Check, X, Loader2, Hash } from 'lucide-react';
+import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, Check, X, Loader2, Hash, Pencil } from 'lucide-react';
 import api from '../api';
 import { useSocketEvent } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
@@ -8,6 +8,7 @@ export default function Chips() {
   const { formatarMoeda: fmt } = useAuth();
   const [chips, setChips] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
+  const [renomeando, setRenomeando] = useState(null); // { id, nome }
   const [criando, setCriando] = useState(false);
   const [nomeNovo, setNomeNovo] = useState('');
   const [salvandoNovo, setSalvandoNovo] = useState(false);
@@ -140,6 +141,17 @@ export default function Chips() {
     }
   }
 
+  async function salvarNomeChip() {
+    if (!renomeando?.nome.trim()) return;
+    try {
+      await api.put(`/chips/${renomeando.id}`, { nome: renomeando.nome.trim() });
+      setRenomeando(null);
+      carregarDados();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao renomear');
+    }
+  }
+
   async function excluirChip(id) {
     if (!confirm('Tem certeza que deseja excluir este chip? Todos os dados vinculados serao removidos.')) return;
     try {
@@ -228,8 +240,29 @@ export default function Chips() {
                   <div className={`p-1.5 rounded-lg shrink-0 ${isConectado ? 'bg-green-100' : 'bg-gray-100'}`}>
                     <Smartphone className={isConectado ? 'text-green-600' : 'text-gray-400'} size={16} />
                   </div>
-                  <div className="min-w-0">
-                    <h3 className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</h3>
+                  <div className="min-w-0 flex-1">
+                    {renomeando?.id === chip.id ? (
+                      <div className="flex items-center gap-1">
+                        <input
+                          autoFocus
+                          value={renomeando.nome}
+                          onChange={(e) => setRenomeando({ ...renomeando, nome: e.target.value })}
+                          onKeyDown={(e) => { if (e.key === 'Enter') salvarNomeChip(); if (e.key === 'Escape') setRenomeando(null); }}
+                          className="text-xs font-semibold border-b border-primary-400 bg-transparent outline-none w-full"
+                        />
+                        <button onClick={salvarNomeChip} className="text-[10px] text-primary-600 font-medium shrink-0">OK</button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 group">
+                        <h3 className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</h3>
+                        <button
+                          onClick={() => setRenomeando({ id: chip.id, nome: chip.nome })}
+                          className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-primary-600 shrink-0"
+                        >
+                          <Pencil size={10} />
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-0.5">
                       {isConectado ? <Wifi size={10} className="text-green-500" /> : <WifiOff size={10} className="text-gray-400" />}
                       <span className={`text-[10px] ${getStatusColor(chip.statusConexao)}`}>{getStatusLabel(chip.statusConexao)}</span>
