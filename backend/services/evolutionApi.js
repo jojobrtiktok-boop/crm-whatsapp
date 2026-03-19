@@ -1,5 +1,5 @@
-// Cliente para Evolution API v2 (Baileys/WHATSAPP-BAILEYS)
-// Suporta @lid nativamente via Baileys
+// Cliente para Evolution API v1.8.x (Baileys)
+// Suporta @lid nativamente
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
@@ -30,21 +30,21 @@ function toBase64(filePath) {
   return fs.readFileSync(filePath).toString('base64');
 }
 
-// Enviar mensagem de texto
+// Enviar mensagem de texto (v1 format)
 async function enviarTexto(instancia, telefone, mensagem) {
   const response = await api.post(`/message/sendText/${instancia}`, {
     number: formatNumber(telefone),
-    text: mensagem,
+    options: { delay: 1200, presence: 'composing' },
+    textMessage: { text: mensagem },
   });
   return response.data;
 }
 
-// Enviar imagem
+// Enviar imagem (v1 format)
 async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
   const isLocal = imagemUrl && !imagemUrl.startsWith('http');
-  const body = isLocal
+  const mediaMessage = isLocal
     ? {
-        number: formatNumber(telefone),
         mediatype: 'image',
         mimetype: mime.lookup(imagemUrl) || 'image/jpeg',
         caption: legenda,
@@ -52,39 +52,36 @@ async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
         fileName: path.basename(imagemUrl),
       }
     : {
-        number: formatNumber(telefone),
         mediatype: 'image',
         caption: legenda,
         media: imagemUrl,
       };
-  const response = await api.post(`/message/sendMedia/${instancia}`, body);
+  const response = await api.post(`/message/sendMedia/${instancia}`, {
+    number: formatNumber(telefone),
+    options: { delay: 1200 },
+    mediaMessage,
+  });
   return response.data;
 }
 
-// Enviar áudio (PTT)
+// Enviar áudio PTT (v1 format)
 async function enviarAudio(instancia, telefone, audioUrl) {
   const isLocal = audioUrl && !audioUrl.startsWith('http');
-  const body = isLocal
-    ? {
-        number: formatNumber(telefone),
-        encoding: true,
-        audio: toBase64(audioUrl),
-      }
-    : {
-        number: formatNumber(telefone),
-        encoding: true,
-        audio: audioUrl,
-      };
-  const response = await api.post(`/message/sendWhatsAppAudio/${instancia}`, body);
+  const response = await api.post(`/message/sendWhatsAppAudio/${instancia}`, {
+    number: formatNumber(telefone),
+    options: { encoding: true },
+    audioMessage: {
+      audio: isLocal ? toBase64(audioUrl) : audioUrl,
+    },
+  });
   return response.data;
 }
 
-// Enviar vídeo
+// Enviar vídeo (v1 format)
 async function enviarVideo(instancia, telefone, videoUrl, legenda = '') {
   const isLocal = videoUrl && !videoUrl.startsWith('http');
-  const body = isLocal
+  const mediaMessage = isLocal
     ? {
-        number: formatNumber(telefone),
         mediatype: 'video',
         mimetype: mime.lookup(videoUrl) || 'video/mp4',
         caption: legenda,
@@ -92,21 +89,23 @@ async function enviarVideo(instancia, telefone, videoUrl, legenda = '') {
         fileName: path.basename(videoUrl),
       }
     : {
-        number: formatNumber(telefone),
         mediatype: 'video',
         caption: legenda,
         media: videoUrl,
       };
-  const response = await api.post(`/message/sendMedia/${instancia}`, body);
+  const response = await api.post(`/message/sendMedia/${instancia}`, {
+    number: formatNumber(telefone),
+    options: { delay: 1200 },
+    mediaMessage,
+  });
   return response.data;
 }
 
-// Enviar documento/PDF
+// Enviar documento/PDF (v1 format)
 async function enviarDocumento(instancia, telefone, docUrl, nomeArquivo = 'documento.pdf') {
   const isLocal = docUrl && !docUrl.startsWith('http');
-  const body = isLocal
+  const mediaMessage = isLocal
     ? {
-        number: formatNumber(telefone),
         mediatype: 'document',
         mimetype: mime.lookup(docUrl) || 'application/pdf',
         caption: '',
@@ -114,17 +113,20 @@ async function enviarDocumento(instancia, telefone, docUrl, nomeArquivo = 'docum
         fileName: nomeArquivo || path.basename(docUrl),
       }
     : {
-        number: formatNumber(telefone),
         mediatype: 'document',
         caption: '',
         media: docUrl,
         fileName: nomeArquivo,
       };
-  const response = await api.post(`/message/sendMedia/${instancia}`, body);
+  const response = await api.post(`/message/sendMedia/${instancia}`, {
+    number: formatNumber(telefone),
+    options: { delay: 1200 },
+    mediaMessage,
+  });
   return response.data;
 }
 
-// Enviar botões (envia como texto - Evolution v2 não tem botões nativos no Baileys)
+// Enviar botões como texto
 async function enviarBotoes(instancia, telefone, titulo, mensagem, botoes) {
   const opcoes = botoes.map((b, i) => `${i + 1}. ${b.texto}`).join('\n');
   return enviarTexto(instancia, telefone, `${mensagem}\n\n${opcoes}`);
@@ -134,7 +136,7 @@ async function enviarBotoes(instancia, telefone, titulo, mensagem, botoes) {
 async function verificarStatus(instancia) {
   try {
     const response = await api.get(`/instance/connectionState/${instancia}`);
-    const state = response.data?.instance?.state || response.data?.state || 'close';
+    const state = response.data?.instance?.state || 'close';
     return { instance: { instanceName: instancia, state }, state };
   } catch {
     return { instance: { instanceName: instancia, state: 'close' }, state: 'close' };
@@ -146,7 +148,8 @@ async function criarInstancia(nomeInstancia) {
   try {
     const response = await api.post('/instance/create', {
       instanceName: nomeInstancia,
-      integration: 'WHATSAPP-BAILEYS',
+      token: config.evolution.apiKey,
+      qrcode: true,
     });
     return response.data;
   } catch (err) {
@@ -162,7 +165,6 @@ async function gerarQRCode(instancia) {
   await criarInstancia(instancia).catch(() => {});
 
   const response = await api.get(`/instance/connect/${instancia}`);
-  // Evolution API v2 retorna { base64: "data:image/png;base64,..." }
   const base64 = response.data?.base64 || response.data?.qrcode?.base64 || null;
   return { base64 };
 }
@@ -245,5 +247,5 @@ module.exports = {
   configurarWebhook,
   baixarMidia,
   buscarFotoPerfil,
-  formatChatId: formatNumber, // compatibilidade com código existente
+  formatChatId: formatNumber,
 };
