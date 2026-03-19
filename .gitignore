@@ -1,0 +1,7 @@
+node_modules/
+.env
+*.db
+uploads/comprovantes/*
+!uploads/comprovantes/.gitkeep
+dist/
+.DS_Store

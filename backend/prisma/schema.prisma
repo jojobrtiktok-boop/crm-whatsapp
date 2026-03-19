@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuários do sistema (admin e operadores)
+model Usuario {
+  id       Int      @id @default(autoincrement())
+  nome     String
+  email    String   @unique
+  senha    String
+  role     String   @default("operador") // admin, operador
+  ativo    Boolean  @default(true)
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@map("usuarios")
+}
+
+// Chips de WhatsApp (cada um é uma instância na Evolution API)
+model Chip {
+  id                 Int      @id @default(autoincrement())
+  nome               String   // "Chip 5023"
+  numero             String
+  instanciaEvolution String   @map("instancia_evolution")
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now()) @map("criado_em")
+
+  clientes     Cliente[]
+  conversas    Conversa[]
+  vendas       Venda[]
+  comprovantes Comprovante[]
+  execucoes    FunilExecucao[]
+
+  @@map("chips")
+}
+
+// Leads/Clientes captados via WhatsApp
+model Cliente {
+  id           Int      @id @default(autoincrement())
+  nome         String?
+  telefone     String   @unique
+  chipOrigemId Int?     @map("chip_origem_id")
+  status       String   @default("novo") // novo, engajado, negociando, comprou, perdido
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  chipOrigem   Chip?           @relation(fields: [chipOrigemId], references: [id])
+  conversas    Conversa[]
+  vendas       Venda[]
+  comprovantes Comprovante[]
+  tags         ClienteTag[]
+  anotacoes    Anotacao[]
+  execucoes    FunilExecucao[]
+  atendimentos Atendimento[]
+
+  @@map("clientes")
+}
+
+// Tags para categorizar leads
+model Tag {
+  id       Int          @id @default(autoincrement())
+  nome     String       @unique
+  cor      String       @default("#3B82F6")
+  clientes ClienteTag[]
+
+  @@map("tags")
+}
+
+// Relação N:N entre clientes e tags
+model ClienteTag {
+  clienteId Int @map("cliente_id")
+  tagId     Int @map("tag_id")
+  cliente   Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  tag       Tag     @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([clienteId, tagId])
+  @@map("clientes_tags")
+}
+
+// Anotações manuais sobre leads
+model Anotacao {
+  id        Int      @id @default(autoincrement())
+  clienteId Int      @map("cliente_id")
+  texto     String
+  criadoEm  DateTime @default(now()) @map("criado_em")
+  cliente   Cliente  @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@map("anotacoes")
+}
+
+// Histórico de mensagens trocadas
+model Conversa {
+  id        Int      @id @default(autoincrement())
+  clienteId Int      @map("cliente_id")
+  chipId    Int      @map("chip_id")
+  tipo      String   // recebida, enviada
+  conteudo  String?
+  tipoMidia String?  @map("tipo_midia") // imagem, audio, video, documento
+  midiaUrl  String?  @map("midia_url")
+  criadoEm  DateTime @default(now()) @map("criado_em")
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  chip    Chip    @relation(fields: [chipId], references: [id])
+
+  @@index([clienteId, criadoEm])
+  @@map("conversas")
+}
+
+// Funis de automação (blocos e conexões armazenados em JSON)
+model Funil {
+  id           Int      @id @default(autoincrement())
+  nome         String
+  descricao    String?
+  ativo        Boolean  @default(false)
+  blocos       Json     @default("[]") // Array de blocos com posição e config
+  conexoes     Json     @default("[]") // Array de conexões entre blocos
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  execucoes FunilExecucao[]
+
+  @@map("funis")
+}
+
+// Execução de funil por lead (rastreia em qual bloco o lead está)
+model FunilExecucao {
+  id           Int      @id @default(autoincrement())
+  funilId      Int      @map("funil_id")
+  clienteId    Int      @map("cliente_id")
+  chipId       Int      @map("chip_id")
+  blocoAtualId String   @map("bloco_atual_id")
+  status       String   @default("ativo") // ativo, pausado, concluido, transferido
+  dados        Json?    // Dados coletados durante execução
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  funil   Funil   @relation(fields: [funilId], references: [id])
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+  chip    Chip    @relation(fields: [chipId], references: [id])
+
+  @@index([clienteId, status])
+  @@map("funil_execucoes")
+}
+
+// Vendas realizadas
+model Venda {
+  id           Int      @id @default(autoincrement())
+  clienteId    Int      @map("cliente_id")
+  chipId       Int      @map("chip_id")
+  valor        Float
+  status       String   @default("pendente") // pendente, confirmado, cancelado, reembolsado
+  descricao    String?
+  criadoEm     DateTime @default(now()) @map("criado_em")
+  atualizadoEm DateTime @updatedAt @map("atualizado_em")
+
+  cliente      Cliente       @relation(fields: [clienteId], references: [id])
+  chip         Chip          @relation(fields: [chipId], references: [id])
+  comprovantes Comprovante[]
+
+  @@index([status, criadoEm])
+  @@map("vendas")
+}
+
+// Comprovantes de pagamento analisados pela IA
+model Comprovante {
+  id                Int      @id @default(autoincrement())
+  vendaId           Int?     @map("venda_id")
+  clienteId         Int      @map("cliente_id")
+  chipId            Int      @map("chip_id")
+  imagemPath        String   @map("imagem_path")
+  nomePagador       String?  @map("nome_pagador")
+  valorExtraido     Float?   @map("valor_extraido")
+  dataPagamento     String?  @map("data_pagamento")
+  banco             String?
+  tipoTransferencia String?  @map("tipo_transferencia")
+  dadosBrutosIA     Json?    @map("dados_brutos_ia")
+  status            String   @default("analisando") // analisando, confirmado, divergente
+  criadoEm          DateTime @default(now()) @map("criado_em")
+
+  venda   Venda?  @relation(fields: [vendaId], references: [id])
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+  chip    Chip    @relation(fields: [chipId], references: [id])
+
+  @@map("comprovantes")
+}
+
+// Atendimentos humanos (quando lead é transferido do bot)
+model Atendimento {
+  id           Int       @id @default(autoincrement())
+  clienteId    Int       @map("cliente_id")
+  operadorId   Int?      @map("operador_id")
+  status       String    @default("aguardando") // aguardando, em_atendimento, finalizado
+  criadoEm     DateTime  @default(now()) @map("criado_em")
+  finalizadoEm DateTime? @map("finalizado_em")
+
+  cliente Cliente @relation(fields: [clienteId], references: [id])
+
+  @@index([status])
+  @@map("atendimentos")
+}
+
+// Configurações gerais do sistema (chave-valor)
+model Configuracao {
+  id    Int    @id @default(autoincrement())
+  chave String @unique
+  valor String
+
+  @@map("configuracoes")
+}
+
+// Números bloqueados
+model Blacklist {
+  id       Int      @id @default(autoincrement())
+  telefone String   @unique
+  motivo   String?
+  criadoEm DateTime @default(now()) @map("criado_em")
+
+  @@map("blacklist")
+}
