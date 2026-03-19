@@ -265,6 +265,37 @@ app.post('/api/:session/send-file-base64', verifyToken, async (req, res) => {
   }
 });
 
+// Listar etiquetas (WhatsApp Business)
+app.get('/api/:session/list-labels', verifyToken, async (req, res) => {
+  const { session } = req.params;
+  const sess = sessions[session];
+  if (!sess?.socket) return res.status(503).json({ error: 'Session not connected' });
+  try {
+    const labels = await sess.socket.getLabels();
+    res.json({ labels: labels || [] });
+  } catch (err) {
+    console.error(`[${session}] Erro ao listar etiquetas:`, err.message);
+    res.json({ labels: [] });
+  }
+});
+
+// Aplicar etiqueta a um contato (WhatsApp Business)
+app.post('/api/:session/label-chat', verifyToken, async (req, res) => {
+  const { session } = req.params;
+  const { phone, labelId } = req.body;
+  const sess = sessions[session];
+  if (!sess?.socket) return res.status(503).json({ error: 'Session not connected' });
+  try {
+    const jid = formatJid(phone);
+    await sess.socket.addChatLabel(jid, labelId);
+    console.log(`[${session}] Etiqueta ${labelId} aplicada a ${jid}`);
+    res.json({ success: true });
+  } catch (err) {
+    console.error(`[${session}] Erro ao aplicar etiqueta:`, err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', sessions: Object.keys(sessions) }));
 

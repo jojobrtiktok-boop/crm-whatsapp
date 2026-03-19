@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -9,6 +9,7 @@ export default function Configuracoes() {
 
   const abas = [
     { key: 'funis', label: 'Funis Ativos', icon: GitBranch },
+    { key: 'pagamento', label: 'Pagamento', icon: CreditCard },
     { key: 'usuarios', label: 'Usuarios', icon: Shield },
     { key: 'blacklist', label: 'Blacklist', icon: Ban },
   ];
@@ -35,6 +36,7 @@ export default function Configuracoes() {
       </div>
 
       {abaAtiva === 'funis' && <ConfigFunis />}
+      {abaAtiva === 'pagamento' && <ConfigPagamento />}
       {abaAtiva === 'usuarios' && <ConfigUsuarios />}
       {abaAtiva === 'blacklist' && <ConfigBlacklist />}
     </div>
@@ -215,6 +217,168 @@ function ConfigFunis() {
           </p>
         )}
       </div>
+    </div>
+  );
+}
+
+function ConfigPagamento() {
+  const [chips, setChips] = useState([]);
+  const [configs, setConfigs] = useState({});
+  const [etiquetas, setEtiquetas] = useState([]);
+  const [chipEtiqueta, setChipEtiqueta] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [carregandoEtiquetas, setCarregandoEtiquetas] = useState(false);
+
+  useEffect(() => {
+    Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
+      setChips(resChips.data);
+      const cfg = resCfg.data;
+      setConfigs({
+        msg_pagamento_confirmado: cfg.msg_pagamento_confirmado || '',
+        etiqueta_pagamento_ativa: cfg.etiqueta_pagamento_ativa === 'true',
+        etiqueta_pagamento_id: cfg.etiqueta_pagamento_id || '',
+        etiqueta_pagamento_instancia: cfg.etiqueta_pagamento_instancia || '',
+      });
+      // Carregar etiquetas do chip já configurado
+      if (cfg.etiqueta_pagamento_instancia) {
+        const chipEncontrado = resChips.data.find(c => c.instanciaEvolution === cfg.etiqueta_pagamento_instancia);
+        if (chipEncontrado) {
+          setChipEtiqueta(String(chipEncontrado.id));
+          buscarEtiquetas(chipEncontrado.id);
+        }
+      }
+    }).catch(console.error);
+  }, []);
+
+  async function buscarEtiquetas(chipId) {
+    if (!chipId) { setEtiquetas([]); return; }
+    setCarregandoEtiquetas(true);
+    try {
+      const res = await api.get(`/chips/${chipId}/etiquetas`);
+      setEtiquetas(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      setEtiquetas([]);
+    } finally {
+      setCarregandoEtiquetas(false);
+    }
+  }
+
+  function handleChipEtiquetaChange(chipId) {
+    setChipEtiqueta(chipId);
+    const chip = chips.find(c => c.id === parseInt(chipId));
+    setConfigs(prev => ({ ...prev, etiqueta_pagamento_instancia: chip?.instanciaEvolution || '' }));
+    buscarEtiquetas(chipId);
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      await api.put('/configuracoes', {
+        msg_pagamento_confirmado: configs.msg_pagamento_confirmado,
+        etiqueta_pagamento_ativa: configs.etiqueta_pagamento_ativa ? 'true' : 'false',
+        etiqueta_pagamento_id: configs.etiqueta_pagamento_id,
+        etiqueta_pagamento_instancia: configs.etiqueta_pagamento_instancia,
+      });
+      alert('Configuracoes salvas!');
+    } catch {
+      alert('Erro ao salvar');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl space-y-6">
+      {/* Mensagem de confirmação */}
+      <div>
+        <h3 className="font-semibold text-gray-800 mb-1">Mensagem de Confirmacao de Pagamento</h3>
+        <p className="text-xs text-gray-500 mb-3">
+          Mensagem enviada automaticamente ao cliente quando o comprovante e aprovado. Use <code className="bg-gray-100 px-1 rounded">{'{valor}'}</code> para inserir o valor pago. Se vazio, usa o idioma padrao do pais do chip.
+        </p>
+        <textarea
+          value={configs.msg_pagamento_confirmado || ''}
+          onChange={(e) => setConfigs(prev => ({ ...prev, msg_pagamento_confirmado: e.target.value }))}
+          className="w-full rounded-lg border-gray-300 text-sm"
+          rows={4}
+          placeholder="Ex: ✅ Pagamento confirmado! Valor: {valor}. Obrigado pela sua compra!"
+        />
+      </div>
+
+      {/* Etiqueta automática */}
+      <div className="border-t border-gray-100 pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold text-gray-800">Etiqueta Automatica no WhatsApp</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Ao confirmar pagamento, etiqueta o contato no WhatsApp Business automaticamente.
+            </p>
+          </div>
+          <button
+            onClick={() => setConfigs(prev => ({ ...prev, etiqueta_pagamento_ativa: !prev.etiqueta_pagamento_ativa }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configs.etiqueta_pagamento_ativa ? 'bg-primary-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configs.etiqueta_pagamento_ativa ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {configs.etiqueta_pagamento_ativa && (
+          <div className="space-y-3 bg-gray-50 rounded-lg p-4">
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Chip para buscar etiquetas</label>
+              <select
+                value={chipEtiqueta}
+                onChange={(e) => handleChipEtiquetaChange(e.target.value)}
+                className="w-full rounded-lg border-gray-300 text-sm"
+              >
+                <option value="">Selecione um chip</option>
+                {chips.filter(c => c.statusConexao === 'open').map(chip => (
+                  <option key={chip.id} value={chip.id}>{chip.nome} ({chip.numero})</option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">Apenas chips conectados. Requer conta WhatsApp Business.</p>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Etiqueta a aplicar</label>
+              {carregandoEtiquetas ? (
+                <p className="text-xs text-gray-400">Carregando etiquetas...</p>
+              ) : etiquetas.length > 0 ? (
+                <select
+                  value={configs.etiqueta_pagamento_id || ''}
+                  onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
+                  className="w-full rounded-lg border-gray-300 text-sm"
+                >
+                  <option value="">Selecione uma etiqueta</option>
+                  {etiquetas.map(et => (
+                    <option key={et.id} value={et.id}>{et.name || et.id}</option>
+                  ))}
+                </select>
+              ) : (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={configs.etiqueta_pagamento_id || ''}
+                    onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
+                    className="w-full rounded-lg border-gray-300 text-sm"
+                    placeholder="ID ou nome da etiqueta (ex: 1)"
+                  />
+                  <p className="text-xs text-gray-400">
+                    {chipEtiqueta ? 'Nenhuma etiqueta encontrada. Digite o ID manualmente.' : 'Selecione um chip acima para carregar etiquetas, ou digite o ID manualmente.'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <button
+        onClick={salvar}
+        disabled={salvando}
+        className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+      >
+        <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Configuracoes'}
+      </button>
     </div>
   );
 }

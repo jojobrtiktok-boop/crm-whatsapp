@@ -245,6 +245,27 @@ async function baixarMidia(sessao, messageId) {
   return null;
 }
 
+// Listar etiquetas disponíveis (WhatsApp Business)
+async function listarEtiquetas(sessao) {
+  try {
+    const api = await apiFor(sessao);
+    const response = await api.get(`/api/${sessao}/list-labels`);
+    return response.data?.labels || [];
+  } catch {
+    return [];
+  }
+}
+
+// Aplicar etiqueta a um contato (WhatsApp Business)
+async function aplicarEtiqueta(sessao, telefone, labelId) {
+  const api = await apiFor(sessao);
+  const response = await api.post(`/api/${sessao}/label-chat`, {
+    phone: formatPhone(telefone),
+    labelId: String(labelId),
+  });
+  return response.data;
+}
+
 // Buscar foto de perfil
 async function buscarFotoPerfil(sessao, telefone) {
   try {
@@ -273,5 +294,7 @@ module.exports = {
   configurarWebhook,
   baixarMidia,
   buscarFotoPerfil,
+  listarEtiquetas,
+  aplicarEtiqueta,
   formatChatId: formatPhone,
 };

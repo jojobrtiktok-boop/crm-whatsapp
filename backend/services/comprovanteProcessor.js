@@ -2,7 +2,7 @@
 const { PrismaClient } = require('@prisma/client');
 const { analisarImagem, analisarTextoPDF } = require('./claudeVision');
 const { emitir } = require('./socketManager');
-const { enviarTexto } = require('./evolutionApi');
+const { enviarTexto, aplicarEtiqueta } = require('./evolutionApi');
 const { detectarPaisDeTelefone, PAISES, MSGS_CONFIRMACAO, MSGS_DIVERGENCIA, formatarMoedaLocal } = require('../utils/paises');
 
 const prisma = new PrismaClient();
@@ -109,12 +109,25 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         data: { status: 'comprou' },
       });
 
-      // Enviar mensagem de confirmação no idioma do cliente
-      const paisCliente = detectarPaisDeTelefone(telefoneCliente);
-      const idiomaCliente = PAISES[paisCliente]?.idioma || 'pt';
-      const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : 'N/A';
-      const msgFn = MSGS_CONFIRMACAO[idiomaCliente] || MSGS_CONFIRMACAO['pt'];
-      const msgConfirmacao = msgFn(valorStr);
+      // Buscar configurações da conta para mensagem personalizada e etiqueta
+      const configsConta = await prisma.configuracao.findMany({
+        where: { chave: { in: ['msg_pagamento_confirmado', 'etiqueta_pagamento_ativa', 'etiqueta_pagamento_id', 'etiqueta_pagamento_instancia'] }, contaId },
+      }).catch(() => []);
+      const cfgMap = Object.fromEntries(configsConta.map(c => [c.chave, c.valor]));
+
+      // Montar mensagem de confirmação (personalizada ou padrão por idioma)
+      let msgConfirmacao;
+      if (cfgMap.msg_pagamento_confirmado) {
+        const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, detectarPaisDeTelefone(telefoneCliente)) : 'N/A';
+        msgConfirmacao = cfgMap.msg_pagamento_confirmado.replace('{valor}', valorStr);
+      } else {
+        const paisCliente = detectarPaisDeTelefone(telefoneCliente);
+        const idiomaCliente = PAISES[paisCliente]?.idioma || 'pt';
+        const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : 'N/A';
+        const msgFn = MSGS_CONFIRMACAO[idiomaCliente] || MSGS_CONFIRMACAO['pt'];
+        msgConfirmacao = msgFn(valorStr);
+      }
+
       try {
         await enviarTexto(instanciaEvolution, telefoneCliente, msgConfirmacao);
         // Salvar mensagem de confirmação no histórico
@@ -124,6 +137,17 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         emitir('mensagem:nova', { conversa: conversaConf, clienteId, chipId }, contaId);
       } catch (err) {
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
+      }
+
+      // Aplicar etiqueta no WhatsApp se configurado
+      if (cfgMap.etiqueta_pagamento_ativa === 'true' && cfgMap.etiqueta_pagamento_id) {
+        try {
+          const instanciaEtiqueta = cfgMap.etiqueta_pagamento_instancia || instanciaEvolution;
+          await aplicarEtiqueta(instanciaEtiqueta, telefoneCliente, cfgMap.etiqueta_pagamento_id);
+          console.log(`[Comprovante] Etiqueta ${cfgMap.etiqueta_pagamento_id} aplicada a ${telefoneCliente}`);
+        } catch (err) {
+          console.error('[Comprovante] Erro ao aplicar etiqueta:', err.message);
+        }
       }
     } else {
       // Avisar cliente sobre divergência no idioma correto

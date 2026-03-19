@@ -335,4 +335,18 @@ router.get('/:id/relatorio', async (req, res, next) => {
   }
 });
 
+// GET /api/chips/:id/etiquetas - Listar etiquetas WhatsApp Business do chip
+router.get('/:id/etiquetas', async (req, res, next) => {
+  try {
+    const chip = await prisma.chip.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
+    });
+    if (!chip) return res.status(404).json({ erro: 'Chip nao encontrado' });
+    const etiquetas = await evolutionApi.listarEtiquetas(chip.instanciaEvolution);
+    res.json(etiquetas);
+  } catch (err) {
+    next(err);
+  }
+});
+
 module.exports = router;
