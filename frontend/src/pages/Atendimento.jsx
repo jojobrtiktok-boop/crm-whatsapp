@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, User, Clock, CheckCircle, PhoneOff } from 'lucide-react';
+import { Send, User, Clock, CheckCircle, PhoneOff, GitBranch, Play } from 'lucide-react';
 import api from '../api';
 import { useSocket, useSocketEvent } from '../hooks/useSocket';
 
@@ -9,17 +9,23 @@ export default function Atendimento() {
   const [conversas, setConversas] = useState([]);
   const [mensagem, setMensagem] = useState('');
   const [chips, setChips] = useState([]);
+  const [funis, setFunis] = useState([]);
+  const [modalFunil, setModalFunil] = useState(false);
+  const [funilParaAtivar, setFunilParaAtivar] = useState('');
+  const [chipParaFunil, setChipParaFunil] = useState('');
   const chatRef = useRef(null);
   const socket = useSocket();
 
   async function carregarAtendimentos() {
     try {
-      const [resAtend, resChips] = await Promise.all([
+      const [resAtend, resChips, resFunis] = await Promise.all([
         api.get('/atendimento'),
         api.get('/chips'),
+        api.get('/funis'),
       ]);
       setAtendimentos(resAtend.data);
       setChips(resChips.data);
+      setFunis(resFunis.data);
     } catch (err) {
       console.error('Erro ao carregar atendimentos:', err);
     }
@@ -166,12 +172,20 @@ export default function Atendimento() {
               <h3 className="font-semibold text-gray-800">{selecionado.cliente?.nome || 'Sem nome'}</h3>
               <p className="text-xs text-gray-500">{selecionado.cliente?.telefone}</p>
             </div>
-            <button
-              onClick={() => finalizarAtendimento(selecionado.id)}
-              className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-3 py-1.5 bg-red-50 rounded-lg"
-            >
-              <PhoneOff size={14} /> Finalizar
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => { setModalFunil(true); setChipParaFunil(chips[0]?.id?.toString() || ''); }}
+                className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 px-3 py-1.5 bg-primary-50 rounded-lg"
+              >
+                <GitBranch size={14} /> Ativar Funil
+              </button>
+              <button
+                onClick={() => finalizarAtendimento(selecionado.id)}
+                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-3 py-1.5 bg-red-50 rounded-lg"
+              >
+                <PhoneOff size={14} /> Finalizar
+              </button>
+            </div>
           </div>
 
           {/* Mensagens */}
@@ -226,6 +240,91 @@ export default function Atendimento() {
           </div>
         </div>
       )}
+
+      {/* Modal ativar funil */}
+      {modalFunil && selecionado && (
+        <ModalAtivarFunil
+          funis={funis}
+          chips={chips}
+          clienteId={selecionado.clienteId}
+          onClose={() => setModalFunil(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalAtivarFunil({ funis, chips, clienteId, onClose }) {
+  const [funilId, setFunilId] = useState('');
+  const [chipId, setChipId] = useState(chips[0]?.id?.toString() || '');
+  const [ativando, setAtivando] = useState(false);
+
+  async function ativar() {
+    if (!funilId || !chipId) {
+      alert('Selecione um funil e um chip');
+      return;
+    }
+    setAtivando(true);
+    try {
+      await api.post('/funis/executar', {
+        funilId: parseInt(funilId),
+        clienteId: parseInt(clienteId),
+        chipId: parseInt(chipId),
+      });
+      alert('Funil ativado para este lead!');
+      onClose();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao ativar funil');
+    } finally {
+      setAtivando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl w-full max-w-sm p-6">
+        <h2 className="text-lg font-bold mb-4">Ativar Funil Manualmente</h2>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Funil</label>
+            <select
+              value={funilId}
+              onChange={(e) => setFunilId(e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm"
+            >
+              <option value="">Selecione o funil</option>
+              {funis.map((f) => (
+                <option key={f.id} value={f.id}>{f.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Chip para envio</label>
+            <select
+              value={chipId}
+              onChange={(e) => setChipId(e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm"
+            >
+              <option value="">Selecione o chip</option>
+              {chips.map((c) => (
+                <option key={c.id} value={c.id}>{c.nome}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-4">
+          <button onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg text-sm">
+            Cancelar
+          </button>
+          <button
+            onClick={ativar}
+            disabled={ativando}
+            className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+          >
+            <Play size={14} /> {ativando ? 'Ativando...' : 'Ativar Funil'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

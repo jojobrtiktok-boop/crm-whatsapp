@@ -197,19 +197,47 @@ export default function FunilEditor() {
     [setEdges]
   );
 
-  // Adicionar novo bloco
+  // Encontrar o ultimo bloco na sequencia (o mais abaixo)
+  function getUltimoBloco(currentNodes) {
+    if (currentNodes.length === 0) return null;
+    return currentNodes.reduce((ultimo, n) =>
+      n.position.y > ultimo.position.y ? n : ultimo
+    , currentNodes[0]);
+  }
+
+  // Adicionar novo bloco (conecta automaticamente ao anterior)
   function adicionarBloco(tipo) {
     const novoId = `bloco-${Date.now()}`;
-    const novoNode = {
-      id: novoId,
-      type: 'blocoNode',
-      position: { x: 250, y: (nodes.length + 1) * 150 },
-      data: {
-        blocoType: tipo,
-        preview: TIPOS_BLOCOS.find((t) => t.type === tipo)?.label,
-      },
-    };
-    setNodes((nds) => [...nds, novoNode]);
+
+    setNodes((nds) => {
+      const ultimoBloco = getUltimoBloco(nds);
+      const yPos = ultimoBloco ? ultimoBloco.position.y + 130 : 50;
+      const xPos = ultimoBloco ? ultimoBloco.position.x : 250;
+
+      const novoNode = {
+        id: novoId,
+        type: 'blocoNode',
+        position: { x: xPos, y: yPos },
+        data: {
+          blocoType: tipo,
+          preview: TIPOS_BLOCOS.find((t) => t.type === tipo)?.label,
+        },
+      };
+
+      // Conectar ao bloco anterior automaticamente (se nao for condicao/esperar_resposta)
+      if (ultimoBloco && ultimoBloco.data.blocoType !== 'condicao' && ultimoBloco.data.blocoType !== 'esperar_resposta') {
+        const novaEdge = {
+          id: `edge-${Date.now()}`,
+          source: ultimoBloco.id,
+          target: novoId,
+          animated: true,
+          style: { stroke: '#94a3b8' },
+        };
+        setEdges((eds) => [...eds, novaEdge]);
+      }
+
+      return [...nds, novoNode];
+    });
   }
 
   // Salvar funil

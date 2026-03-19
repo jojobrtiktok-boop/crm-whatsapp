@@ -132,6 +132,47 @@ router.post('/:id/duplicar', async (req, res, next) => {
   }
 });
 
+// POST /api/funis/executar - Executar funil manualmente para um cliente
+router.post('/executar', async (req, res, next) => {
+  try {
+    const { funilId, clienteId, chipId } = req.body;
+
+    if (!funilId || !clienteId || !chipId) {
+      return res.status(400).json({ erro: 'funilId, clienteId e chipId sao obrigatorios' });
+    }
+
+    const funil = await prisma.funil.findUnique({ where: { id: funilId } });
+    if (!funil) {
+      return res.status(404).json({ erro: 'Funil nao encontrado' });
+    }
+
+    const blocos = funil.blocos || [];
+    const primeiroBlocoId = blocos[0]?.id || 'inicio';
+
+    const execucao = await prisma.funilExecucao.create({
+      data: {
+        funilId,
+        clienteId,
+        chipId,
+        blocoAtualId: primeiroBlocoId,
+        status: 'ativo',
+      },
+    });
+
+    // Iniciar execucao do funil via engine
+    try {
+      const funilEngine = require('../services/funilEngine');
+      await funilEngine.iniciarFunil(funilId, clienteId, chipId);
+    } catch (err) {
+      console.error('Erro ao iniciar motor do funil:', err);
+    }
+
+    res.status(201).json({ mensagem: 'Funil ativado', execucao });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // DELETE /api/funis/:id - Deletar funil
 router.delete('/:id', async (req, res, next) => {
   try {
