@@ -10,11 +10,11 @@ const api = axios.create({
   },
 });
 
-// Enviar mensagem de texto
+// Enviar mensagem de texto (compatível com Evolution API v1.x e v2.x)
 async function enviarTexto(instancia, telefone, mensagem) {
   const response = await api.post(`/message/sendText/${instancia}`, {
     number: telefone,
-    text: mensagem,
+    textMessage: { text: mensagem },
   });
   return response.data;
 }
@@ -23,9 +23,11 @@ async function enviarTexto(instancia, telefone, mensagem) {
 async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
   const response = await api.post(`/message/sendMedia/${instancia}`, {
     number: telefone,
-    mediatype: 'image',
-    media: imagemUrl,
-    caption: legenda,
+    mediaMessage: {
+      mediatype: 'image',
+      media: imagemUrl,
+      caption: legenda,
+    },
   });
   return response.data;
 }
@@ -34,7 +36,7 @@ async function enviarImagem(instancia, telefone, imagemUrl, legenda = '') {
 async function enviarAudio(instancia, telefone, audioUrl) {
   const response = await api.post(`/message/sendWhatsAppAudio/${instancia}`, {
     number: telefone,
-    audio: audioUrl,
+    audioMessage: { audio: audioUrl },
   });
   return response.data;
 }
@@ -43,9 +45,11 @@ async function enviarAudio(instancia, telefone, audioUrl) {
 async function enviarVideo(instancia, telefone, videoUrl, legenda = '') {
   const response = await api.post(`/message/sendMedia/${instancia}`, {
     number: telefone,
-    mediatype: 'video',
-    media: videoUrl,
-    caption: legenda,
+    mediaMessage: {
+      mediatype: 'video',
+      media: videoUrl,
+      caption: legenda,
+    },
   });
   return response.data;
 }
