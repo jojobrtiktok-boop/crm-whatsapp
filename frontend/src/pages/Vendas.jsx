@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Download, Filter, Eye, DollarSign } from 'lucide-react';
 import api from '../api';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Vendas() {
+  const { formatarMoeda } = useAuth();
   const [vendas, setVendas] = useState([]);
   const [chips, setChips] = useState([]);
   const [total, setTotal] = useState(0);
@@ -63,8 +65,6 @@ export default function Vendas() {
     }
   }
 
-  const formatarMoeda = (valor) =>
-    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
 
   return (
     <div className="space-y-4">

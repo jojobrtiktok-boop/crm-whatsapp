@@ -3,8 +3,10 @@ import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api';
 import { useSocketEvent } from '../hooks/useSocket';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Chips() {
+  const { formatarMoeda: fmt } = useAuth();
   const [chips, setChips] = useState([]);
   const [comparativo, setComparativo] = useState([]);
   const [relatorio, setRelatorio] = useState(null);
@@ -188,7 +190,6 @@ export default function Chips() {
     return 'text-gray-400';
   }
 
-  const fmt = (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0);
 
   return (
     <div className="space-y-6">

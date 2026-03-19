@@ -162,15 +162,7 @@ async function processarMensagemWaha(payload, instancia) {
 
   // Processar resposta no funil
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
-
-  // Iniciar funil se for novo lead
-  const execucaoAtiva = await prisma.funilExecucao.findFirst({
-    where: { clienteId: cliente.id, status: 'ativo' },
-  });
-
-  if (!execucaoAtiva && cliente.status === 'novo') {
-    await iniciarFunil(cliente.id, chip.id, chip.contaId);
-  }
+  await verificarEIniciarFunil(chip, cliente, conteudo);
 }
 
 // ─── WAHA: Processa recibo de leitura (ack) ─────────────────────────────────
@@ -283,14 +275,7 @@ async function processarMensagem(evento, instancia) {
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
-
-  const execucaoAtiva = await prisma.funilExecucao.findFirst({
-    where: { clienteId: cliente.id, status: 'ativo' },
-  });
-
-  if (!execucaoAtiva && cliente.status === 'novo') {
-    await iniciarFunil(cliente.id, chip.id, chip.contaId);
-  }
+  await verificarEIniciarFunil(chip, cliente, conteudo);
 }
 
 // ─── Evolution API: Recibos de leitura ──────────────────────────────────────
@@ -434,13 +419,7 @@ async function processarMensagemWPP(data, instancia) {
 
   // Processar no funil
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
-
-  const execucaoAtiva = await prisma.funilExecucao.findFirst({
-    where: { clienteId: cliente.id, status: 'ativo' },
-  });
-  if (!execucaoAtiva && cliente.status === 'novo') {
-    await iniciarFunil(cliente.id, chip.id, chip.contaId);
-  }
+  await verificarEIniciarFunil(chip, cliente, conteudo);
 }
 
 // ─── WPPConnect: Processa recibo de leitura ──────────────────────────────────
@@ -462,6 +441,57 @@ async function processarReciboWPP(data) {
     }
   } catch (err) {
     console.error('[Webhook] Erro ao processar recibo WPP:', err.message);
+  }
+}
+
+// ─── Helper: decide se deve iniciar funil conforme gatilho configurado ────────
+async function verificarEIniciarFunil(chip, cliente, conteudo) {
+  // Verificar se há execução ativa
+  const execucaoAtiva = await prisma.funilExecucao.findFirst({
+    where: { clienteId: cliente.id, status: 'ativo' },
+  });
+  if (execucaoAtiva) return; // já em andamento
+
+  // Buscar config de vinculações do chip
+  const configVinc = await prisma.configuracao.findFirst({
+    where: { chave: 'funis_vinculados', contaId: chip.contaId },
+  });
+
+  let vinculacoes = [];
+  if (configVinc?.valor) {
+    try { vinculacoes = JSON.parse(configVinc.valor); } catch {}
+  }
+
+  const vinc = vinculacoes.find(v => v.chipId === chip.id && v.ativo !== false);
+
+  if (!vinc) {
+    // Sem vinculação configurada: comportamento legado (só nova uma vez)
+    if (cliente.status === 'novo') {
+      await iniciarFunil(cliente.id, chip.id, chip.contaId);
+    }
+    return;
+  }
+
+  const gatilho = vinc.gatilho || 'uma_vez';
+
+  if (gatilho === 'uma_vez') {
+    // Apenas se nunca teve execução
+    const jaExecutou = await prisma.funilExecucao.findFirst({
+      where: { clienteId: cliente.id, funilId: vinc.funilId },
+    });
+    if (!jaExecutou) {
+      await iniciarFunil(cliente.id, chip.id, chip.contaId, vinc.funilId);
+    }
+  } else if (gatilho === 'sempre') {
+    // Toda mensagem reinicia (desde que não haja execução ativa - já verificado acima)
+    await iniciarFunil(cliente.id, chip.id, chip.contaId, vinc.funilId);
+  } else if (gatilho === 'palavras') {
+    const palavras = (vinc.palavras || []).map(p => p.toLowerCase().trim()).filter(Boolean);
+    const msg = (conteudo || '').toLowerCase();
+    const match = palavras.some(p => msg.includes(p));
+    if (match) {
+      await iniciarFunil(cliente.id, chip.id, chip.contaId, vinc.funilId);
+    }
   }
 }
 

@@ -96,6 +96,8 @@ function ConfigFunis() {
       chipId: parseInt(chipSelecionado),
       funilId: parseInt(funilSelecionado),
       ativo: true,
+      gatilho: 'uma_vez',
+      palavras: [],
     };
 
     const novasVinculacoes = [...vinculacoes, novaVinculacao];
@@ -176,38 +178,76 @@ function ConfigFunis() {
       </div>
 
       {/* Lista de vinculacoes */}
-      <div className="space-y-2">
+      <div className="space-y-3">
         {vinculacoes.map((vinc, index) => (
-          <div key={index} className="flex items-center justify-between py-3 px-3 border border-gray-100 rounded-lg bg-gray-50">
-            <div className="flex items-center gap-3">
-              <div className={`p-1.5 rounded-lg ${vinc.ativo ? 'bg-green-100' : 'bg-gray-200'}`}>
-                <Smartphone size={14} className={vinc.ativo ? 'text-green-600' : 'text-gray-400'} />
+          <div key={index} className="border border-gray-100 rounded-lg bg-gray-50 overflow-hidden">
+            <div className="flex items-center justify-between py-3 px-3">
+              <div className="flex items-center gap-3">
+                <div className={`p-1.5 rounded-lg ${vinc.ativo ? 'bg-green-100' : 'bg-gray-200'}`}>
+                  <Smartphone size={14} className={vinc.ativo ? 'text-green-600' : 'text-gray-400'} />
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{getNomeChip(vinc.chipId)}</p>
+                  <p className="text-xs text-gray-500">
+                    <GitBranch size={10} className="inline mr-1" />
+                    {getNomeFunil(vinc.funilId)}
+                  </p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium">{getNomeChip(vinc.chipId)}</p>
-                <p className="text-xs text-gray-500">
-                  <GitBranch size={10} className="inline mr-1" />
-                  {getNomeFunil(vinc.funilId)}
-                </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => toggleVinculacao(index)}
+                  className={`p-1.5 rounded-lg ${vinc.ativo ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'}`}
+                  title={vinc.ativo ? 'Pausar' : 'Ativar'}
+                >
+                  {vinc.ativo ? <Play size={14} /> : <Pause size={14} />}
+                </button>
+                <span className={`text-xs px-2 py-0.5 rounded-full ${vinc.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {vinc.ativo ? 'Ativo' : 'Pausado'}
+                </span>
+                <button onClick={() => removerVinculacao(index)} className="text-gray-400 hover:text-red-500">
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => toggleVinculacao(index)}
-                className={`p-1.5 rounded-lg ${vinc.ativo ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'}`}
-                title={vinc.ativo ? 'Pausar' : 'Ativar'}
-              >
-                {vinc.ativo ? <Play size={14} /> : <Pause size={14} />}
-              </button>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${vinc.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {vinc.ativo ? 'Ativo' : 'Pausado'}
-              </span>
-              <button
-                onClick={() => removerVinculacao(index)}
-                className="text-gray-400 hover:text-red-500"
-              >
-                <Trash2 size={14} />
-              </button>
+            {/* Configuração do gatilho */}
+            <div className="border-t border-gray-100 px-3 py-2 bg-white space-y-2">
+              <div className="flex items-center gap-3">
+                <label className="text-xs text-gray-500 w-16 shrink-0">Gatilho</label>
+                <select
+                  value={vinc.gatilho || 'uma_vez'}
+                  onChange={(e) => {
+                    const novas = [...vinculacoes];
+                    novas[index] = { ...novas[index], gatilho: e.target.value, palavras: novas[index].palavras || [] };
+                    salvarVinculacoes(novas);
+                  }}
+                  className="text-xs rounded border-gray-300 py-1"
+                >
+                  <option value="uma_vez">Uma vez por numero</option>
+                  <option value="sempre">Sempre (toda mensagem)</option>
+                  <option value="palavras">Palavras especificas</option>
+                </select>
+              </div>
+              {(vinc.gatilho || 'uma_vez') === 'palavras' && (
+                <div className="flex items-start gap-3">
+                  <label className="text-xs text-gray-500 w-16 shrink-0 pt-1">Palavras</label>
+                  <div className="flex-1">
+                    <input
+                      type="text"
+                      defaultValue={(vinc.palavras || []).join(', ')}
+                      onBlur={(e) => {
+                        const palavras = e.target.value.split(',').map(p => p.trim()).filter(Boolean);
+                        const novas = [...vinculacoes];
+                        novas[index] = { ...novas[index], palavras };
+                        salvarVinculacoes(novas);
+                      }}
+                      className="w-full text-xs rounded border-gray-300 py-1"
+                      placeholder="oi, ola, quero, boa tarde"
+                    />
+                    <p className="text-[10px] text-gray-400 mt-0.5">Separe por virgula. Qualquer uma das palavras dispara o funil.</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ))}
