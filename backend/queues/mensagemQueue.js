@@ -23,12 +23,7 @@ mensagemQueue.process(async (job) => {
     return;
   }
 
-  // @lid é formato privado do WhatsApp - Evolution API v1.x não consegue enviar
-  if (telefone && telefone.includes('@lid')) {
-    console.log(`[MensagemQueue] Ignorando @lid (formato privado): ${telefone}`);
-    return;
-  }
-
+  // WAHA NOWEB suporta @lid nativamente - não ignorar mais
   console.log(`[MensagemQueue] Enviando ${tipo} para ${telefone} via ${instancia}`);
 
   let resultado = null;

@@ -8,13 +8,6 @@ const prisma = new PrismaClient();
 
 // Inicia um funil para um lead
 async function iniciarFunil(clienteId, chipId, funilIdEspecifico = null) {
-  // Verificar se o lead tem número real (não @lid)
-  const clienteCheck = await prisma.cliente.findUnique({ where: { id: clienteId }, select: { telefone: true } });
-  if (clienteCheck?.telefone?.includes('@lid')) {
-    console.log(`[Funil] Ignorando @lid - não é possível enviar mensagens: ${clienteCheck.telefone}`);
-    return null;
-  }
-
   // Buscar funil específico ou o primeiro ativo
   const funil = await prisma.funil.findFirst({
     where: funilIdEspecifico ? { id: funilIdEspecifico } : { ativo: true },
