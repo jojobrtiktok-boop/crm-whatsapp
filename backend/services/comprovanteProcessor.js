@@ -3,6 +3,7 @@ const { PrismaClient } = require('@prisma/client');
 const { analisarImagem, analisarTextoPDF } = require('./claudeVision');
 const { emitir } = require('./socketManager');
 const { enviarTexto } = require('./evolutionApi');
+const { detectarPaisDeTelefone, PAISES, MSGS_CONFIRMACAO, MSGS_DIVERGENCIA, formatarMoedaLocal } = require('../utils/paises');
 
 const prisma = new PrismaClient();
 
@@ -104,9 +105,12 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         data: { status: 'comprou' },
       });
 
-      // Enviar mensagem de confirmação e salvar no histórico
-      const valorStr = dados.valor ? `R$ ${dados.valor.toFixed(2)}` : 'N/A';
-      const msgConfirmacao = `✅ Pagamento confirmado!\nValor: ${valorStr}\nObrigado pela compra! 🙏`;
+      // Enviar mensagem de confirmação no idioma do cliente
+      const paisCliente = detectarPaisDeTelefone(telefoneCliente);
+      const idiomaCliente = PAISES[paisCliente]?.idioma || 'pt';
+      const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : 'N/A';
+      const msgFn = MSGS_CONFIRMACAO[idiomaCliente] || MSGS_CONFIRMACAO['pt'];
+      const msgConfirmacao = msgFn(valorStr);
       try {
         const chip = await prisma.chip.findUnique({ where: { id: chipId } });
         await enviarTexto(instanciaEvolution, telefoneCliente, msgConfirmacao);
@@ -119,8 +123,12 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
       }
     } else {
-      // Avisar operador sobre divergência de valor
-      const msgDivergencia = `⚠️ Comprovante recebido mas valor divergente.\nValor no comprovante: R$ ${dados.valor?.toFixed(2) || 'N/A'}\nPor favor, entre em contato conosco.`;
+      // Avisar cliente sobre divergência no idioma correto
+      const paisClienteDiv = detectarPaisDeTelefone(telefoneCliente);
+      const idiomaClienteDiv = PAISES[paisClienteDiv]?.idioma || 'pt';
+      const valorDivStr = dados.valor ? formatarMoedaLocal(dados.valor, paisClienteDiv) : 'N/A';
+      const msgDivFn = MSGS_DIVERGENCIA[idiomaClienteDiv] || MSGS_DIVERGENCIA['pt'];
+      const msgDivergencia = msgDivFn(valorDivStr);
       try {
         await enviarTexto(instanciaEvolution, telefoneCliente, msgDivergencia);
         const conversaDiv = await prisma.conversa.create({

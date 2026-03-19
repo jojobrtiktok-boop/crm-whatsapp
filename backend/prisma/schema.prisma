@@ -15,6 +15,9 @@ model Usuario {
   senha    String
   role     String   @default("operador") // admin, operador
   ativo    Boolean  @default(true)
+  pais     String   @default("BR")
+  moeda    String   @default("BRL")
+  idioma   String   @default("pt")
   criadoEm DateTime @default(now()) @map("criado_em")
 
   @@map("usuarios")

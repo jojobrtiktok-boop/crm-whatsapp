@@ -42,8 +42,19 @@ export function AuthProvider({ children }) {
     setUsuario(null);
   }
 
+  const moeda = usuario?.moeda || 'BRL';
+  const idioma = usuario?.idioma || 'pt';
+  const pais = usuario?.pais || 'BR';
+
+  const LOCALES = { pt: 'pt-BR', es: 'es-AR', en: 'en-US' };
+  const locale = LOCALES[idioma] || 'pt-BR';
+
+  function formatarMoeda(valor) {
+    return new Intl.NumberFormat(locale, { style: 'currency', currency: moeda }).format(valor || 0);
+  }
+
   return (
-    <AuthContext.Provider value={{ usuario, carregando, login, logout }}>
+    <AuthContext.Provider value={{ usuario, carregando, login, logout, moeda, idioma, pais, formatarMoeda }}>
       {children}
     </AuthContext.Provider>
   );

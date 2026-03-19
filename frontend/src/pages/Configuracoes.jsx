@@ -295,10 +295,22 @@ function ConfigGeral() {
   );
 }
 
+const PAISES = [
+  { codigo: 'BR', nome: 'Brasil 🇧🇷', moeda: 'BRL', idioma: 'pt' },
+  { codigo: 'AR', nome: 'Argentina 🇦🇷', moeda: 'ARS', idioma: 'es' },
+  { codigo: 'MX', nome: 'México 🇲🇽', moeda: 'MXN', idioma: 'es' },
+  { codigo: 'CL', nome: 'Chile 🇨🇱', moeda: 'CLP', idioma: 'es' },
+  { codigo: 'CO', nome: 'Colômbia 🇨🇴', moeda: 'COP', idioma: 'es' },
+  { codigo: 'UY', nome: 'Uruguai 🇺🇾', moeda: 'UYU', idioma: 'es' },
+  { codigo: 'PY', nome: 'Paraguai 🇵🇾', moeda: 'PYG', idioma: 'es' },
+  { codigo: 'US', nome: 'EUA 🇺🇸', moeda: 'USD', idioma: 'en' },
+  { codigo: 'PT', nome: 'Portugal 🇵🇹', moeda: 'EUR', idioma: 'pt' },
+];
+
 function ConfigUsuarios() {
   const [usuarios, setUsuarios] = useState([]);
   const [modalAberto, setModalAberto] = useState(false);
-  const [form, setForm] = useState({ nome: '', email: '', senha: '', role: 'operador' });
+  const [form, setForm] = useState({ nome: '', email: '', senha: '', role: 'operador', pais: 'BR' });
 
   useEffect(() => {
     api.get('/usuarios').then((res) => setUsuarios(res.data)).catch(console.error);
@@ -308,7 +320,7 @@ function ConfigUsuarios() {
     try {
       await api.post('/usuarios', form);
       setModalAberto(false);
-      setForm({ nome: '', email: '', senha: '', role: 'operador' });
+      setForm({ nome: '', email: '', senha: '', role: 'operador', pais: 'BR' });
       const res = await api.get('/usuarios');
       setUsuarios(res.data);
     } catch (err) {
@@ -344,7 +356,7 @@ function ConfigUsuarios() {
           <div key={u.id} className="flex items-center justify-between py-2 border-b border-gray-100">
             <div>
               <p className="text-sm font-medium">{u.nome}</p>
-              <p className="text-xs text-gray-500">{u.email} - {u.role}</p>
+              <p className="text-xs text-gray-500">{u.email} · {u.role} · {u.moeda || 'BRL'} ({u.pais || 'BR'})</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`text-xs px-2 py-0.5 rounded-full ${u.ativo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
@@ -370,6 +382,23 @@ function ConfigUsuarios() {
                 <option value="operador">Operador</option>
                 <option value="admin">Administrador</option>
               </select>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">País (define moeda e idioma das confirmações)</label>
+                <select
+                  value={form.pais}
+                  onChange={(e) => setForm({ ...form, pais: e.target.value })}
+                  className="w-full rounded-lg border-gray-300 text-sm"
+                >
+                  {PAISES.map((p) => (
+                    <option key={p.codigo} value={p.codigo}>{p.nome} — {p.moeda}</option>
+                  ))}
+                </select>
+              </div>
+              {form.pais && (
+                <p className="text-xs text-blue-600 bg-blue-50 rounded-lg px-3 py-2">
+                  Moeda: <strong>{PAISES.find(p => p.codigo === form.pais)?.moeda}</strong> · Idioma das mensagens: <strong>{PAISES.find(p => p.codigo === form.pais)?.idioma === 'pt' ? 'Português' : PAISES.find(p => p.codigo === form.pais)?.idioma === 'es' ? 'Espanhol' : 'Inglês'}</strong>
+                </p>
+              )}
             </div>
             <div className="flex gap-2 mt-4">
               <button onClick={() => setModalAberto(false)} className="flex-1 py-2 bg-gray-100 rounded-lg text-sm">Cancelar</button>

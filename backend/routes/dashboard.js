@@ -150,6 +150,51 @@ router.get('/comparativo-chips', async (req, res, next) => {
   }
 });
 
+// GET /api/dashboard/chips-resumo - Resumo por chip (dia e semana)
+router.get('/chips-resumo', async (req, res, next) => {
+  try {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    const inicioSemana = new Date(hoje);
+    inicioSemana.setDate(hoje.getDate() - 6); // últimos 7 dias
+
+    const chips = await prisma.chip.findMany({
+      where: { ativo: true },
+      select: { id: true, nome: true, numero: true },
+    });
+
+    const resumo = await Promise.all(
+      chips.map(async (chip) => {
+        const [dia, semana, leadsDia] = await Promise.all([
+          prisma.venda.aggregate({
+            where: { chipId: chip.id, status: 'confirmado', criadoEm: { gte: hoje } },
+            _sum: { valor: true },
+            _count: true,
+          }),
+          prisma.venda.aggregate({
+            where: { chipId: chip.id, status: 'confirmado', criadoEm: { gte: inicioSemana } },
+            _sum: { valor: true },
+            _count: true,
+          }),
+          prisma.cliente.count({ where: { chipOrigemId: chip.id, criadoEm: { gte: hoje } } }),
+        ]);
+
+        return {
+          id: chip.id,
+          nome: chip.nome,
+          numero: chip.numero,
+          dia: { vendas: dia._count, valor: dia._sum.valor || 0, leads: leadsDia },
+          semana: { vendas: semana._count, valor: semana._sum.valor || 0 },
+        };
+      })
+    );
+
+    res.json(resumo);
+  } catch (err) {
+    next(err);
+  }
+});
+
 // GET /api/dashboard/vendas-recentes - Últimas vendas
 router.get('/vendas-recentes', async (req, res, next) => {
   try {
