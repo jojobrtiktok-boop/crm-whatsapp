@@ -41,39 +41,47 @@ router.get('/', async (req, res, next) => {
   }
 });
 
-// POST /api/chips/sincronizar - Importar instâncias da Evolution API
+// POST /api/chips/sincronizar - Importar sessões do WAHA
 router.post('/sincronizar', async (req, res, next) => {
   try {
     const axios = require('axios');
     const config = require('../config');
 
-    const response = await axios.get(`${config.evolution.url}/instance/fetchInstances`, {
-      headers: { apikey: config.evolution.apiKey },
-    });
+    // Tentar WAHA primeiro, depois Evolution API
+    let sessoes = [];
+    try {
+      const response = await axios.get(`${config.evolution.url}/api/sessions`, {
+        headers: { 'X-Api-Key': config.evolution.apiKey },
+      });
+      sessoes = (response.data || []).map((s) => ({
+        nome: s.name,
+        numero: '',
+        profileName: s.name,
+        isWaha: true,
+      }));
+    } catch {
+      // Fallback: Evolution API
+      const response = await axios.get(`${config.evolution.url}/instance/fetchInstances`, {
+        headers: { apikey: config.evolution.apiKey },
+      });
+      sessoes = (response.data || []).map((inst) => ({
+        nome: inst.instance?.instanceName || inst.instanceName,
+        numero: inst.instance?.owner?.replace('@s.whatsapp.net', '').replace('@c.us', '') || '',
+        profileName: inst.instance?.profileName || inst.instance?.instanceName,
+        isWaha: false,
+      }));
+    }
 
-    const instancias = response.data || [];
     const importados = [];
     const jaExistentes = [];
 
-    for (const inst of instancias) {
-      const nome = inst.instance?.instanceName || inst.instanceName;
-      if (!nome) continue;
-
-      const existente = await prisma.chip.findFirst({ where: { instanciaEvolution: nome } });
-      if (existente) {
-        jaExistentes.push(nome);
-        continue;
-      }
-
-      const profileName = inst.instance?.profileName || nome;
-      const numero = inst.instance?.owner?.replace('@s.whatsapp.net', '') || '';
+    for (const s of sessoes) {
+      if (!s.nome) continue;
+      const existente = await prisma.chip.findFirst({ where: { instanciaEvolution: s.nome } });
+      if (existente) { jaExistentes.push(s.nome); continue; }
 
       const chip = await prisma.chip.create({
-        data: {
-          nome: profileName || nome,
-          numero,
-          instanciaEvolution: nome,
-        },
+        data: { nome: s.profileName || s.nome, numero: s.numero, instanciaEvolution: s.nome },
       });
       importados.push(chip);
     }
@@ -81,7 +89,7 @@ router.post('/sincronizar', async (req, res, next) => {
     res.json({ importados: importados.length, jaExistentes: jaExistentes.length, chips: importados });
   } catch (err) {
     console.error('Erro ao sincronizar:', err.response?.data || err.message);
-    res.status(500).json({ erro: 'Erro ao sincronizar com Evolution API' });
+    res.status(500).json({ erro: 'Erro ao sincronizar' });
   }
 });
 

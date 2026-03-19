@@ -1,4 +1,4 @@
-// Rota de webhook - recebe eventos da Evolution API
+// Rota de webhook - recebe eventos do WAHA (WhatsApp HTTP API)
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const path = require('path');
@@ -12,19 +12,30 @@ const { emitir } = require('../services/socketManager');
 
 const prisma = new PrismaClient();
 
-// POST /api/webhook/evolution - Recebe eventos da Evolution API
+// POST /api/webhook/evolution - Recebe eventos do WAHA
 router.post('/evolution', async (req, res) => {
-  // Responder imediatamente para não travar o webhook
   res.status(200).json({ recebido: true });
 
   try {
     const evento = req.body;
-    const instancia = evento.instance || evento.instanceName;
+    // WAHA usa "session", Evolution usa "instance"
+    const instancia = evento.session || evento.instance || evento.instanceName;
 
     if (!instancia) return;
 
-    // Verificar tipo de evento
-    if (evento.event === 'messages.upsert' || evento.data?.message) {
+    // === Formato WAHA ===
+    if (evento.event === 'message' && evento.payload) {
+      if (!evento.payload.fromMe) {
+        await processarMensagemWaha(evento.payload, instancia);
+      }
+    } else if (evento.event === 'message.ack' && evento.payload) {
+      await processarReciboWaha(evento.payload);
+    } else if (evento.event === 'session.status' && evento.payload) {
+      const state = evento.payload.status === 'WORKING' ? 'open' : 'close';
+      emitir('chip:status', { instancia, status: state === 'open' ? 'online' : 'offline' });
+
+    // === Formato Evolution API (compatibilidade) ===
+    } else if (evento.event === 'messages.upsert' || evento.data?.message) {
       await processarMensagem(evento, instancia);
     } else if (evento.event === 'messages.update') {
       await processarRecibo(evento);
@@ -36,34 +47,31 @@ router.post('/evolution', async (req, res) => {
   }
 });
 
-// Processa mensagem recebida do WhatsApp
-async function processarMensagem(evento, instancia) {
-  const mensagem = evento.data;
-  if (!mensagem) return;
+// ─── WAHA: Processa mensagem recebida ───────────────────────────────────────
+async function processarMensagemWaha(payload, instancia) {
+  const remoteJid = payload.from || '';
 
-  // Ignorar mensagens enviadas pelo próprio bot
-  if (mensagem.key?.fromMe) return;
-
-  const remoteJid = mensagem.key?.remoteJid || '';
   // Pular grupos e newsletters
   if (remoteJid.includes('@g.us') || remoteJid.includes('@newsletter')) return;
-  // Para @s.whatsapp.net: extrair só o número. Para @lid: guardar JID completo (não tem número real)
-  const telefone = remoteJid.includes('@s.whatsapp.net')
-    ? remoteJid.replace('@s.whatsapp.net', '')
-    : remoteJid;
+
+  // Extrair telefone: @c.us → número, @lid → manter completo
+  let telefone;
+  if (remoteJid.includes('@c.us')) {
+    telefone = remoteJid.replace('@c.us', '');
+  } else {
+    telefone = remoteJid; // @lid ou outro formato
+  }
+
   if (!telefone || telefone.includes('status')) return;
 
   // Verificar blacklist
   const bloqueado = await prisma.blacklist.findUnique({ where: { telefone } });
-  if (bloqueado) {
-    console.log(`[Webhook] Número bloqueado: ${telefone}`);
-    return;
-  }
+  if (bloqueado) return;
 
-  // Buscar chip que recebeu
+  // Buscar chip
   const chip = await buscarChipPorInstancia(instancia);
   if (!chip) {
-    console.log(`[Webhook] Chip não encontrado para instância: ${instancia}`);
+    console.log(`[Webhook] Chip não encontrado para sessão: ${instancia}`);
     return;
   }
 
@@ -73,40 +81,30 @@ async function processarMensagem(evento, instancia) {
     cliente = await prisma.cliente.create({
       data: {
         telefone,
-        nome: mensagem.pushName || null,
+        nome: payload.notifyName || payload._data?.notifyName || null,
         chipOrigemId: chip.id,
         status: 'novo',
       },
     });
-    console.log(`[Webhook] Novo lead: ${telefone} (${mensagem.pushName || 'sem nome'})`);
+    console.log(`[Webhook] Novo lead: ${telefone} (${cliente.nome || 'sem nome'})`);
     emitir('lead:novo', cliente);
-  } else if (mensagem.pushName && !cliente.nome) {
-    // Atualizar nome se não tinha
+  } else if ((payload.notifyName || payload._data?.notifyName) && !cliente.nome) {
     cliente = await prisma.cliente.update({
       where: { id: cliente.id },
-      data: { nome: mensagem.pushName },
+      data: { nome: payload.notifyName || payload._data?.notifyName },
     });
   }
 
-  // Extrair conteúdo da mensagem
-  const msgData = mensagem.message || {};
-  let conteudo = msgData.conversation
-    || msgData.extendedTextMessage?.text
-    || msgData.imageMessage?.caption
-    || msgData.videoMessage?.caption
-    || '';
-
+  // Extrair conteúdo
+  let conteudo = payload.body || '';
   let tipoMidia = null;
-  let midiaUrl = null;
 
-  if (msgData.imageMessage) {
-    tipoMidia = 'imagem';
-  } else if (msgData.audioMessage) {
-    tipoMidia = 'audio';
-  } else if (msgData.videoMessage) {
-    tipoMidia = 'video';
-  } else if (msgData.documentMessage) {
-    tipoMidia = 'documento';
+  if (payload.hasMedia || payload.type !== 'chat') {
+    const tipo = payload.type;
+    if (tipo === 'image') tipoMidia = 'imagem';
+    else if (tipo === 'audio' || tipo === 'ptt') tipoMidia = 'audio';
+    else if (tipo === 'video') tipoMidia = 'video';
+    else if (tipo === 'document') tipoMidia = 'documento';
   }
 
   // Salvar conversa
@@ -117,31 +115,20 @@ async function processarMensagem(evento, instancia) {
       tipo: 'recebida',
       conteudo,
       tipoMidia,
-      midiaUrl,
     },
   });
 
-  // Emitir nova mensagem via WebSocket
-  emitir('mensagem:nova', {
-    conversa,
-    clienteId: cliente.id,
-    chipId: chip.id,
-  });
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
 
-  // Se é imagem, enviar para IA analisar (pode ser comprovante ou não)
-  if (tipoMidia === 'imagem') {
-    await processarImagem(evento, instancia, cliente, chip, mensagem);
+  // Processar imagem (possível comprovante)
+  if (tipoMidia === 'imagem' && payload.media?.url) {
+    await processarImagemWaha(payload, instancia, cliente, chip);
   }
 
-  // Se é documento PDF, extrair texto e analisar
-  if (tipoMidia === 'documento' && msgData.documentMessage?.mimetype === 'application/pdf') {
-    await processarPDF(evento, instancia, cliente, chip, mensagem);
-  }
-
-  // Processar resposta dentro do funil (se houver execução ativa)
+  // Processar resposta no funil
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
 
-  // Se é novo lead sem funil ativo, iniciar funil
+  // Iniciar funil se for novo lead
   const execucaoAtiva = await prisma.funilExecucao.findFirst({
     where: { clienteId: cliente.id, status: 'ativo' },
   });
@@ -151,93 +138,124 @@ async function processarMensagem(evento, instancia) {
   }
 }
 
-// Processa imagem recebida (possível comprovante)
-async function processarImagem(evento, instancia, cliente, chip, mensagem) {
+// ─── WAHA: Processa recibo de leitura (ack) ─────────────────────────────────
+async function processarReciboWaha(payload) {
   try {
-    // Tentar baixar a mídia via Evolution API
-    const mediaUrl = `${config.evolution.url}/chat/getBase64FromMediaMessage/${instancia}`;
-    const response = await axios.post(
-      mediaUrl,
-      { message: mensagem },
-      { headers: { apikey: config.evolution.apiKey } }
-    );
+    const msgId = payload.id;
+    const ack = payload.ack;
 
-    if (response.data?.base64) {
-      // Salvar imagem
-      const nomeArquivo = `comprovante_${cliente.id}_${Date.now()}.jpg`;
-      const caminhoArquivo = path.join(config.upload.path, 'comprovantes', nomeArquivo);
+    let novoStatus = null;
+    if (ack >= 4) novoStatus = 'lido';
+    else if (ack === 3) novoStatus = 'entregue';
 
-      // Garantir que o diretório existe
-      fs.mkdirSync(path.dirname(caminhoArquivo), { recursive: true });
-
-      const buffer = Buffer.from(response.data.base64, 'base64');
-      fs.writeFileSync(caminhoArquivo, buffer);
-
-      // Adicionar à fila de processamento de comprovantes
-      await comprovanteQueue.add({
-        clienteId: cliente.id,
-        chipId: chip.id,
-        imagemPath: caminhoArquivo,
-        instanciaEvolution: instancia,
-        telefoneCliente: cliente.telefone,
-      });
-
-      console.log(`[Webhook] Imagem salva e enfileirada para análise: ${nomeArquivo}`);
-    }
-  } catch (err) {
-    console.error('[Webhook] Erro ao processar imagem:', err.message);
-  }
-}
-
-// Processa PDF recebido (possível comprovante)
-async function processarPDF(evento, instancia, cliente, chip, mensagem) {
-  try {
-    const mediaUrl = `${config.evolution.url}/chat/getBase64FromMediaMessage/${instancia}`;
-    const response = await axios.post(
-      mediaUrl,
-      { message: mensagem },
-      { headers: { apikey: config.evolution.apiKey } }
-    );
-
-    if (response.data?.base64) {
-      const nomeArquivo = `documento_${cliente.id}_${Date.now()}.pdf`;
-      const caminhoArquivo = path.join(config.upload.path, 'comprovantes', nomeArquivo);
-
-      fs.mkdirSync(path.dirname(caminhoArquivo), { recursive: true });
-
-      const buffer = Buffer.from(response.data.base64, 'base64');
-      fs.writeFileSync(caminhoArquivo, buffer);
-
-      // Extrair texto do PDF
-      let textoPDF = '';
-      try {
-        const pdfParse = require('pdf-parse');
-        const pdfData = await pdfParse(buffer);
-        textoPDF = pdfData.text;
-        console.log(`[Webhook] Texto extraído do PDF (${textoPDF.length} chars)`);
-      } catch (err) {
-        console.error('[Webhook] Erro ao extrair texto do PDF:', err.message);
-        return;
-      }
-
-      if (textoPDF.trim()) {
-        await comprovanteQueue.add({
-          clienteId: cliente.id,
-          chipId: chip.id,
-          imagemPath: caminhoArquivo,
-          instanciaEvolution: instancia,
-          telefoneCliente: cliente.telefone,
-          textoPDF,
-        });
-        console.log(`[Webhook] PDF enfileirado para análise: ${nomeArquivo}`);
+    if (novoStatus && msgId) {
+      const conversa = await prisma.conversa.findFirst({ where: { wamid: msgId } });
+      if (conversa) {
+        await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
+        emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
+        console.log(`[Webhook] Recibo WAHA: msg ${msgId} → ${novoStatus}`);
       }
     }
   } catch (err) {
-    console.error('[Webhook] Erro ao processar PDF:', err.message);
+    console.error('[Webhook] Erro ao processar recibo WAHA:', err.message);
   }
 }
 
-// Processa recibos de leitura do WhatsApp (✓✓ entregue / ✓✓ azul lido)
+// ─── WAHA: Processa imagem (possível comprovante) ───────────────────────────
+async function processarImagemWaha(payload, instancia, cliente, chip) {
+  try {
+    if (!payload.media?.url) return;
+
+    const response = await axios.get(payload.media.url, { responseType: 'arraybuffer' });
+    const nomeArquivo = `comprovante_${cliente.id}_${Date.now()}.jpg`;
+    const caminhoArquivo = path.join(config.upload.path, 'comprovantes', nomeArquivo);
+
+    fs.mkdirSync(path.dirname(caminhoArquivo), { recursive: true });
+    fs.writeFileSync(caminhoArquivo, Buffer.from(response.data));
+
+    await comprovanteQueue.add({
+      clienteId: cliente.id,
+      chipId: chip.id,
+      imagemPath: caminhoArquivo,
+      instanciaEvolution: instancia,
+      telefoneCliente: cliente.telefone,
+    });
+
+    console.log(`[Webhook] Imagem WAHA enfileirada: ${nomeArquivo}`);
+  } catch (err) {
+    console.error('[Webhook] Erro ao processar imagem WAHA:', err.message);
+  }
+}
+
+// ─── Evolution API: Processa mensagem (compatibilidade) ─────────────────────
+async function processarMensagem(evento, instancia) {
+  const mensagem = evento.data;
+  if (!mensagem) return;
+
+  if (mensagem.key?.fromMe) return;
+
+  const remoteJid = mensagem.key?.remoteJid || '';
+  if (remoteJid.includes('@g.us') || remoteJid.includes('@newsletter')) return;
+  const telefone = remoteJid.includes('@s.whatsapp.net')
+    ? remoteJid.replace('@s.whatsapp.net', '')
+    : remoteJid;
+  if (!telefone || telefone.includes('status')) return;
+
+  const bloqueado = await prisma.blacklist.findUnique({ where: { telefone } });
+  if (bloqueado) return;
+
+  const chip = await buscarChipPorInstancia(instancia);
+  if (!chip) return;
+
+  let cliente = await prisma.cliente.findUnique({ where: { telefone } });
+  if (!cliente) {
+    cliente = await prisma.cliente.create({
+      data: {
+        telefone,
+        nome: mensagem.pushName || null,
+        chipOrigemId: chip.id,
+        status: 'novo',
+      },
+    });
+    emitir('lead:novo', cliente);
+  } else if (mensagem.pushName && !cliente.nome) {
+    cliente = await prisma.cliente.update({
+      where: { id: cliente.id },
+      data: { nome: mensagem.pushName },
+    });
+  }
+
+  const msgData = mensagem.message || {};
+  let conteudo = msgData.conversation
+    || msgData.extendedTextMessage?.text
+    || msgData.imageMessage?.caption
+    || msgData.videoMessage?.caption
+    || '';
+
+  let tipoMidia = null;
+  if (msgData.imageMessage) tipoMidia = 'imagem';
+  else if (msgData.audioMessage) tipoMidia = 'audio';
+  else if (msgData.videoMessage) tipoMidia = 'video';
+  else if (msgData.documentMessage) tipoMidia = 'documento';
+
+  const conversa = await prisma.conversa.create({
+    data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia },
+  });
+
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id });
+
+  await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
+
+  const execucaoAtiva = await prisma.funilExecucao.findFirst({
+    where: { clienteId: cliente.id, status: 'ativo' },
+  });
+
+  if (!execucaoAtiva && cliente.status === 'novo') {
+    await iniciarFunil(cliente.id, chip.id);
+  }
+}
+
+// ─── Evolution API: Recibos de leitura ──────────────────────────────────────
 async function processarRecibo(evento) {
   try {
     const updates = Array.isArray(evento.data) ? evento.data : [evento.data];
@@ -255,7 +273,6 @@ async function processarRecibo(evento) {
         if (conversa) {
           await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
           emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId });
-          console.log(`[Webhook] Recibo: msg ${wamid} → ${novoStatus}`);
         }
       }
     }
@@ -264,11 +281,9 @@ async function processarRecibo(evento) {
   }
 }
 
-// Processa atualização de conexão do chip
+// ─── Evolution API: Status de conexão ───────────────────────────────────────
 async function processarConexao(evento, instancia) {
   const state = evento.data?.state || evento.state;
-  console.log(`[Webhook] Status da conexão ${instancia}: ${state}`);
-
   emitir('chip:status', {
     instancia,
     status: state === 'open' ? 'online' : 'offline',
