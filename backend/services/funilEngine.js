@@ -346,7 +346,7 @@ async function criarConversa(clienteId, chipId, conteudo, tipoMidia = null, midi
         status: 'enviado',
       },
     });
-    emitir('mensagem:nova', conversa);
+    emitir('mensagem:nova', { conversa, clienteId: conversa.clienteId, chipId: conversa.chipId });
     return conversa;
   } catch (err) {
     console.error('[Funil] Erro ao criar conversa:', err.message);
