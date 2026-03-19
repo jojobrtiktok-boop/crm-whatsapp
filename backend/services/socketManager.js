@@ -36,8 +36,12 @@ function inicializarSocketManager(io) {
 function emitir(evento, dados, contaId = null) {
   if (!ioInstance) return;
   if (contaId) {
-    ioInstance.to(`conta:${contaId}`).emit(evento, dados);
+    const sala = `conta:${contaId}`;
+    const sockets = ioInstance.sockets.adapter.rooms.get(sala);
+    console.log(`[Socket] Emitindo "${evento}" para ${sala} (${sockets?.size || 0} cliente(s))`);
+    ioInstance.to(sala).emit(evento, dados);
   } else {
+    console.log(`[Socket] Emitindo "${evento}" global`);
     ioInstance.emit(evento, dados);
   }
 }
