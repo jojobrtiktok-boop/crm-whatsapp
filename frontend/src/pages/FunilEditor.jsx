@@ -8,6 +8,8 @@ import {
   useNodesState,
   useEdgesState,
   Panel,
+  Handle,
+  Position,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
@@ -35,12 +37,27 @@ const TIPOS_BLOCOS = [
 function BlocoNode({ data }) {
   const tipoInfo = TIPOS_BLOCOS.find((t) => t.type === data.blocoType) || TIPOS_BLOCOS[0];
   const Icone = tipoInfo.icon;
+  const isCondicao = data.blocoType === 'condicao';
+  const isBotoes = data.blocoType === 'botoes';
 
   return (
     <div
-      className="bg-white rounded-lg border-2 shadow-sm min-w-[200px] cursor-pointer"
+      className="bg-white rounded-lg border-2 shadow-sm min-w-[200px] cursor-pointer relative"
       style={{ borderColor: tipoInfo.cor }}
     >
+      {/* Handle de entrada (topo) */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        style={{
+          background: tipoInfo.cor,
+          width: 12,
+          height: 12,
+          border: '2px solid white',
+          top: -6,
+        }}
+      />
+
       <div className="flex items-center gap-2 px-3 py-2 rounded-t-md" style={{ backgroundColor: tipoInfo.cor + '15' }}>
         <Icone size={14} style={{ color: tipoInfo.cor }} />
         <span className="text-xs font-semibold" style={{ color: tipoInfo.cor }}>{tipoInfo.label}</span>
@@ -50,6 +67,52 @@ function BlocoNode({ data }) {
           {data.preview || 'Clique para configurar'}
         </p>
       </div>
+
+      {/* Handle de saída (base) */}
+      {isCondicao ? (
+        <>
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="sim"
+            style={{
+              background: '#22c55e',
+              width: 12,
+              height: 12,
+              border: '2px solid white',
+              bottom: -6,
+              left: '30%',
+            }}
+          />
+          <div className="absolute text-[9px] font-bold text-green-600" style={{ bottom: -18, left: '26%' }}>Sim</div>
+          <Handle
+            type="source"
+            position={Position.Bottom}
+            id="nao"
+            style={{
+              background: '#ef4444',
+              width: 12,
+              height: 12,
+              border: '2px solid white',
+              bottom: -6,
+              left: '70%',
+            }}
+          />
+          <div className="absolute text-[9px] font-bold text-red-600" style={{ bottom: -18, left: '66%' }}>Não</div>
+        </>
+      ) : (
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          style={{
+            background: tipoInfo.cor,
+            width: 12,
+            height: 12,
+            border: '2px solid white',
+            bottom: -6,
+          }}
+        />
+      )}
     </div>
   );
 }
