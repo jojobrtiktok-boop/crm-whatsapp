@@ -23,12 +23,13 @@ function formatPhone(telefone) {
 }
 
 // Obtém token da sessão (gera se não existir)
+// WPPConnect: secretKey vai na URL - POST /api/:session/:secretkey/generate-token
 async function getToken(sessao) {
   if (tokenCache[sessao]) return tokenCache[sessao];
 
   const response = await axios.post(
-    `${BASE_URL}/api/${sessao}/generate-token`,
-    { secretKey: SECRET_KEY },
+    `${BASE_URL}/api/${sessao}/${SECRET_KEY}/generate-token`,
+    {},
     { headers: { 'Content-Type': 'application/json' }, timeout: 15000 }
   );
   const token = response.data?.token;
