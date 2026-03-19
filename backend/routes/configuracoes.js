@@ -21,7 +21,7 @@ router.get('/', async (req, res, next) => {
 });
 
 // PUT /api/configuracoes - Atualizar configurações (recebe objeto chave-valor)
-router.put('/', apenasAdmin, async (req, res, next) => {
+router.put('/', async (req, res, next) => {
   try {
     const configs = req.body;
 

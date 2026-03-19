@@ -125,7 +125,7 @@ function ConfigFunis() {
       });
       setVinculacoes(novasVinculacoes);
     } catch (err) {
-      alert('Erro ao salvar');
+      alert('Erro ao salvar: ' + (err.response?.data?.erro || err.message));
     } finally {
       setSalvando(false);
     }
