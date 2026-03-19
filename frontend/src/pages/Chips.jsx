@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, Check, X, Loader2, Hash } from 'lucide-react';
+import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, Check, X, Loader2, Hash, Download } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../api';
 import { useSocketEvent } from '../hooks/useSocket';
@@ -11,6 +11,7 @@ export default function Chips() {
   const [criando, setCriando] = useState(false);
   const [nomeNovo, setNomeNovo] = useState('');
   const [salvandoNovo, setSalvandoNovo] = useState(false);
+  const [sincronizando, setSincronizando] = useState(false);
 
   // Estado do modal de conexão
   const [modalConexao, setModalConexao] = useState(null); // { chipId, chipNome }
@@ -40,6 +41,20 @@ export default function Chips() {
 
   const handleChipStatus = useCallback(() => { carregarDados(); }, []);
   useSocketEvent('chip:status', handleChipStatus);
+
+  async function sincronizarEvolution() {
+    setSincronizando(true);
+    try {
+      const res = await api.post('/chips/sincronizar');
+      const { importados, jaExistentes } = res.data;
+      alert(`Sincronizado! ${importados} importado(s), ${jaExistentes} já existia(m).`);
+      carregarDados();
+    } catch (err) {
+      alert(err.response?.data?.erro || 'Erro ao sincronizar');
+    } finally {
+      setSincronizando(false);
+    }
+  }
 
   async function criarChip() {
     if (!nomeNovo.trim()) return;
@@ -179,12 +194,22 @@ export default function Chips() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Chips WhatsApp</h1>
-        <button
-          onClick={() => setCriando(true)}
-          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"
-        >
-          <Plus size={16} /> Novo Chip
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={sincronizarEvolution}
+            disabled={sincronizando}
+            className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50"
+          >
+            {sincronizando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Importar da Evolution
+          </button>
+          <button
+            onClick={() => setCriando(true)}
+            className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700"
+          >
+            <Plus size={16} /> Novo Chip
+          </button>
+        </div>
       </div>
 
       {/* Form inline de criacao */}

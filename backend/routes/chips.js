@@ -41,6 +41,50 @@ router.get('/', async (req, res, next) => {
   }
 });
 
+// POST /api/chips/sincronizar - Importar instâncias da Evolution API
+router.post('/sincronizar', async (req, res, next) => {
+  try {
+    const axios = require('axios');
+    const config = require('../config');
+
+    const response = await axios.get(`${config.evolution.url}/instance/fetchInstances`, {
+      headers: { apikey: config.evolution.apiKey },
+    });
+
+    const instancias = response.data || [];
+    const importados = [];
+    const jaExistentes = [];
+
+    for (const inst of instancias) {
+      const nome = inst.instance?.instanceName || inst.instanceName;
+      if (!nome) continue;
+
+      const existente = await prisma.chip.findFirst({ where: { instanciaEvolution: nome } });
+      if (existente) {
+        jaExistentes.push(nome);
+        continue;
+      }
+
+      const profileName = inst.instance?.profileName || nome;
+      const numero = inst.instance?.owner?.replace('@s.whatsapp.net', '') || '';
+
+      const chip = await prisma.chip.create({
+        data: {
+          nome: profileName || nome,
+          numero,
+          instanciaEvolution: nome,
+        },
+      });
+      importados.push(chip);
+    }
+
+    res.json({ importados: importados.length, jaExistentes: jaExistentes.length, chips: importados });
+  } catch (err) {
+    console.error('Erro ao sincronizar:', err.response?.data || err.message);
+    res.status(500).json({ erro: 'Erro ao sincronizar com Evolution API' });
+  }
+});
+
 // POST /api/chips - Criar novo chip (só nome obrigatório)
 router.post('/', async (req, res, next) => {
   try {
