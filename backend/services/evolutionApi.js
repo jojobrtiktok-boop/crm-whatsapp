@@ -110,9 +110,9 @@ async function gerarQRCode(instancia) {
   // Garantir que a sessão existe
   await criarInstancia(instancia).catch(() => {});
 
-  // Buscar QR Code
+  // Buscar QR Code - WAHA usa /api/{session}/auth/qr (sem "sessions/")
   try {
-    const response = await api.get(`/api/sessions/${instancia}/auth/qr`, {
+    const response = await api.get(`/api/${instancia}/auth/qr`, {
       params: { format: 'image' },
       responseType: 'arraybuffer',
     });
@@ -120,7 +120,7 @@ async function gerarQRCode(instancia) {
     return { base64 };
   } catch {
     // Tentar formato JSON
-    const response = await api.get(`/api/sessions/${instancia}/auth/qr`);
+    const response = await api.get(`/api/${instancia}/auth/qr`);
     return { base64: response.data?.value || response.data?.qr || null };
   }
 }
@@ -129,7 +129,7 @@ async function gerarQRCode(instancia) {
 async function gerarPairingCode(instancia, telefone) {
   await criarInstancia(instancia).catch(() => {});
   try {
-    const response = await api.post(`/api/sessions/${instancia}/auth/request-code`, {
+    const response = await api.post(`/api/${instancia}/auth/request-code`, {
       phoneNumber: telefone.replace(/\D/g, ''),
     });
     return { code: response.data?.code };
