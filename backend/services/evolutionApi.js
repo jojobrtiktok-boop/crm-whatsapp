@@ -131,6 +131,18 @@ async function baixarMidia(instancia, messageId) {
   return response.data;
 }
 
+// Buscar foto de perfil
+async function buscarFotoPerfil(instancia, telefone) {
+  try {
+    const response = await api.get(`/chat/fetchProfilePictureUrl/${instancia}`, {
+      params: { number: telefone },
+    });
+    return response.data?.profilePictureUrl || response.data?.url || null;
+  } catch {
+    return null;
+  }
+}
+
 module.exports = {
   enviarTexto,
   enviarImagem,
@@ -144,4 +156,5 @@ module.exports = {
   deletarInstancia,
   configurarWebhook,
   baixarMidia,
+  buscarFotoPerfil,
 };

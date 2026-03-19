@@ -11,6 +11,7 @@ export default function Atendimento() {
   const [chips, setChips] = useState([]);
   const [funis, setFunis] = useState([]);
   const [modalFunil, setModalFunil] = useState(false);
+  const [fotos, setFotos] = useState({});
   const chatRef = useRef(null);
   const socket = useSocket();
 
@@ -24,6 +25,12 @@ export default function Atendimento() {
       setLeads(resLeads.data);
       setChips(resChips.data);
       setFunis(resFunis.data);
+      // Buscar fotos em background (sem bloquear)
+      resLeads.data.forEach((lead) => {
+        api.get(`/clientes/${lead.id}/foto`).then((r) => {
+          if (r.data?.url) setFotos((prev) => ({ ...prev, [lead.id]: r.data.url }));
+        }).catch(() => {});
+      });
     } catch (err) {
       console.error('Erro ao carregar:', err);
     }
@@ -105,7 +112,7 @@ export default function Atendimento() {
   return (
     <div className="h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-gray-200 overflow-hidden">
       {/* Lista de leads */}
-      <div className="w-80 border-r border-gray-200 flex flex-col">
+      <div className="w-96 border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
           <h2 className="font-semibold text-gray-800">Painel de Controle</h2>
           <p className="text-xs text-gray-500 mt-1">{leads.length} conversas</p>
@@ -120,8 +127,11 @@ export default function Atendimento() {
                 selecionado?.id === lead.id ? 'bg-primary-50' : ''
               }`}
             >
-              <div className="bg-gray-200 rounded-full p-2 shrink-0">
-                <User size={16} className="text-gray-500" />
+              <div className="shrink-0 w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center">
+                {fotos[lead.id]
+                  ? <img src={fotos[lead.id]} alt="" className="w-full h-full object-cover" />
+                  : <User size={18} className="text-gray-500" />
+                }
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1">
@@ -174,6 +184,13 @@ export default function Atendimento() {
         <div className="flex-1 flex flex-col">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center shrink-0">
+                {fotos[selecionado.id]
+                  ? <img src={fotos[selecionado.id]} alt="" className="w-full h-full object-cover" />
+                  : <User size={16} className="text-gray-500" />
+                }
+              </div>
             <div>
               <h3 className="font-semibold text-gray-800">{selecionado.nome || 'Sem nome'}</h3>
               <div className="flex items-center gap-2">
@@ -185,6 +202,7 @@ export default function Atendimento() {
                   </span>
                 )}
               </div>
+            </div>
             </div>
             <button
               onClick={() => setModalFunil(true)}

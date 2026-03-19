@@ -146,26 +146,8 @@ router.post('/executar', async (req, res, next) => {
       return res.status(404).json({ erro: 'Funil nao encontrado' });
     }
 
-    const blocos = funil.blocos || [];
-    const primeiroBlocoId = blocos[0]?.id || 'inicio';
-
-    const execucao = await prisma.funilExecucao.create({
-      data: {
-        funilId,
-        clienteId,
-        chipId,
-        blocoAtualId: primeiroBlocoId,
-        status: 'ativo',
-      },
-    });
-
-    // Iniciar execucao do funil via engine
-    try {
-      const funilEngine = require('../services/funilEngine');
-      await funilEngine.iniciarFunil(funilId, clienteId, chipId);
-    } catch (err) {
-      console.error('Erro ao iniciar motor do funil:', err);
-    }
+    const funilEngine = require('../services/funilEngine');
+    const execucao = await funilEngine.iniciarFunil(clienteId, chipId, funilId);
 
     res.status(201).json({ mensagem: 'Funil ativado', execucao });
   } catch (err) {

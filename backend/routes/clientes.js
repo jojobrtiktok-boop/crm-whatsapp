@@ -202,4 +202,24 @@ router.post('/:id/anotacoes', async (req, res, next) => {
   }
 });
 
+// GET /api/clientes/:id/foto - Buscar foto de perfil do WhatsApp
+router.get('/:id/foto', async (req, res, next) => {
+  try {
+    const cliente = await prisma.cliente.findUnique({
+      where: { id: parseInt(req.params.id) },
+      include: { chipOrigem: { select: { instanciaEvolution: true } } },
+    });
+
+    if (!cliente || !cliente.chipOrigem) {
+      return res.json({ url: null });
+    }
+
+    const evolutionApi = require('../services/evolutionApi');
+    const url = await evolutionApi.buscarFotoPerfil(cliente.chipOrigem.instanciaEvolution, cliente.telefone);
+    res.json({ url });
+  } catch {
+    res.json({ url: null });
+  }
+});
+
 module.exports = router;
