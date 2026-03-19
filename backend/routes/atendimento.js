@@ -11,7 +11,10 @@ router.use(autenticar);
 router.get('/', async (req, res, next) => {
   try {
     const leads = await prisma.cliente.findMany({
-      where: { conversas: { some: {} }, chipOrigem: { contaId: req.usuario.contaId } },
+      where: {
+        contaId: req.usuario.contaId,
+        conversas: { some: {} },
+      },
       include: {
         chipOrigem: { select: { id: true, nome: true, numero: true } },
         conversas: {
