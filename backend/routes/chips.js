@@ -1,7 +1,8 @@
-// Rotas de gestão de chips WhatsApp
+// Rotas de gestao de chips WhatsApp
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
+const evolutionApi = require('../services/evolutionApi');
 
 const prisma = new PrismaClient();
 
@@ -21,21 +22,47 @@ router.get('/', async (req, res, next) => {
         },
       },
     });
-    res.json(chips);
+
+    // Buscar status de cada chip na Evolution API
+    const chipsComStatus = await Promise.all(
+      chips.map(async (chip) => {
+        try {
+          const status = await evolutionApi.verificarStatus(chip.instanciaEvolution);
+          return { ...chip, statusConexao: status?.state || status?.instance?.state || 'close' };
+        } catch {
+          return { ...chip, statusConexao: 'close' };
+        }
+      })
+    );
+
+    res.json(chipsComStatus);
   } catch (err) {
     next(err);
   }
 });
 
-// POST /api/chips - Criar novo chip
+// POST /api/chips - Criar novo chip (cria instancia na Evolution API)
 router.post('/', async (req, res, next) => {
   try {
-    const { nome, numero, instanciaEvolution } = req.body;
+    const { nome, numero } = req.body;
 
-    if (!nome || !numero || !instanciaEvolution) {
-      return res.status(400).json({ erro: 'Nome, número e instância são obrigatórios' });
+    if (!nome || !numero) {
+      return res.status(400).json({ erro: 'Nome e numero sao obrigatorios' });
     }
 
+    // Gerar nome da instancia a partir do nome do chip
+    const instanciaEvolution = nome.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+
+    // Criar instancia na Evolution API
+    try {
+      await evolutionApi.criarInstancia(instanciaEvolution);
+    } catch (err) {
+      if (!err.response || err.response.status !== 409) {
+        console.error('Erro ao criar instancia Evolution:', err.response?.data || err.message);
+      }
+    }
+
+    // Salvar chip no banco
     const chip = await prisma.chip.create({
       data: { nome, numero, instanciaEvolution },
     });
@@ -46,13 +73,79 @@ router.post('/', async (req, res, next) => {
   }
 });
 
+// GET /api/chips/:id/qrcode - Gerar QR Code para conectar WhatsApp
+router.get('/:id/qrcode', async (req, res, next) => {
+  try {
+    const chip = await prisma.chip.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+
+    if (!chip) {
+      return res.status(404).json({ erro: 'Chip nao encontrado' });
+    }
+
+    // Tentar criar instancia primeiro (caso nao exista)
+    try {
+      await evolutionApi.criarInstancia(chip.instanciaEvolution);
+    } catch {
+      // Instancia ja existe, ok
+    }
+
+    // Gerar QR Code
+    const resultado = await evolutionApi.gerarQRCode(chip.instanciaEvolution);
+    res.json(resultado);
+  } catch (err) {
+    console.error('Erro ao gerar QR Code:', err.response?.data || err.message);
+    res.status(500).json({ erro: 'Erro ao gerar QR Code', detalhe: err.response?.data || err.message });
+  }
+});
+
+// GET /api/chips/:id/status - Verificar status da conexao
+router.get('/:id/status', async (req, res, next) => {
+  try {
+    const chip = await prisma.chip.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+
+    if (!chip) {
+      return res.status(404).json({ erro: 'Chip nao encontrado' });
+    }
+
+    const status = await evolutionApi.verificarStatus(chip.instanciaEvolution);
+    res.json(status);
+  } catch (err) {
+    console.error('Erro ao verificar status:', err.response?.data || err.message);
+    res.status(500).json({ erro: 'Erro ao verificar status' });
+  }
+});
+
+// POST /api/chips/:id/webhook - Configurar webhook do chip
+router.post('/:id/webhook', async (req, res, next) => {
+  try {
+    const chip = await prisma.chip.findUnique({
+      where: { id: parseInt(req.params.id) },
+    });
+
+    if (!chip) {
+      return res.status(404).json({ erro: 'Chip nao encontrado' });
+    }
+
+    const webhookUrl = `${req.protocol}://${req.get('host')}/api/webhook/evolution`;
+    const resultado = await evolutionApi.configurarWebhook(chip.instanciaEvolution, webhookUrl);
+    res.json({ mensagem: 'Webhook configurado', resultado });
+  } catch (err) {
+    console.error('Erro ao configurar webhook:', err.response?.data || err.message);
+    res.status(500).json({ erro: 'Erro ao configurar webhook' });
+  }
+});
+
 // PUT /api/chips/:id - Atualizar chip
 router.put('/:id', async (req, res, next) => {
   try {
-    const { nome, numero, instanciaEvolution, ativo } = req.body;
+    const { nome, numero, ativo } = req.body;
     const chip = await prisma.chip.update({
       where: { id: parseInt(req.params.id) },
-      data: { nome, numero, instanciaEvolution, ativo },
+      data: { nome, numero, ativo },
     });
     res.json(chip);
   } catch (err) {
@@ -73,7 +166,7 @@ router.delete('/:id', async (req, res, next) => {
   }
 });
 
-// GET /api/chips/:id/relatorio - Relatório detalhado do chip
+// GET /api/chips/:id/relatorio - Relatorio detalhado do chip
 router.get('/:id/relatorio', async (req, res, next) => {
   try {
     const chipId = parseInt(req.params.id);
@@ -87,10 +180,9 @@ router.get('/:id/relatorio', async (req, res, next) => {
 
     const chip = await prisma.chip.findUnique({ where: { id: chipId } });
     if (!chip) {
-      return res.status(404).json({ erro: 'Chip não encontrado' });
+      return res.status(404).json({ erro: 'Chip nao encontrado' });
     }
 
-    // Vendas do dia, semana e mês
     const [vendasDia, vendasSemana, vendasMes, totalClientes] = await Promise.all([
       prisma.venda.aggregate({
         where: { chipId, status: 'confirmado', criadoEm: { gte: hoje } },

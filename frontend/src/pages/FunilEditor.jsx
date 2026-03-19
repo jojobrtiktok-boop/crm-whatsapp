@@ -14,7 +14,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   Save, ArrowLeft, MessageSquare, Image, Mic, Video,
-  List, Clock, GitBranch, Bot, Receipt, Tag, ArrowRightLeft,
+  List, Clock, GitBranch, Bot, Receipt, Tag, ArrowRightLeft, MessageCircle,
 } from 'lucide-react';
 import api from '../api';
 
@@ -28,6 +28,7 @@ const TIPOS_BLOCOS = [
   { type: 'delay', label: 'Delay', icon: Clock, cor: '#6b7280' },
   { type: 'condicao', label: 'Condição', icon: GitBranch, cor: '#ef4444' },
   { type: 'ia', label: 'IA', icon: Bot, cor: '#06b6d4' },
+  { type: 'esperar_resposta', label: 'Esperar Resposta', icon: MessageCircle, cor: '#0ea5e9' },
   { type: 'comprovante', label: 'Comprovante', icon: Receipt, cor: '#14b8a6' },
   { type: 'tag', label: 'Tag', icon: Tag, cor: '#f97316' },
   { type: 'transferencia', label: 'Transferir', icon: ArrowRightLeft, cor: '#a855f7' },
@@ -38,6 +39,7 @@ function BlocoNode({ data }) {
   const tipoInfo = TIPOS_BLOCOS.find((t) => t.type === data.blocoType) || TIPOS_BLOCOS[0];
   const Icone = tipoInfo.icon;
   const isCondicao = data.blocoType === 'condicao';
+  const isEsperarResposta = data.blocoType === 'esperar_resposta';
   const isBotoes = data.blocoType === 'botoes';
 
   return (
@@ -68,13 +70,13 @@ function BlocoNode({ data }) {
         </p>
       </div>
 
-      {/* Handle de saída (base) */}
-      {isCondicao ? (
+      {/* Handle de saida (base) */}
+      {isCondicao || isEsperarResposta ? (
         <>
           <Handle
             type="source"
             position={Position.Bottom}
-            id="sim"
+            id={isCondicao ? 'sim' : 'respondeu'}
             style={{
               background: '#22c55e',
               width: 12,
@@ -84,11 +86,13 @@ function BlocoNode({ data }) {
               left: '30%',
             }}
           />
-          <div className="absolute text-[9px] font-bold text-green-600" style={{ bottom: -18, left: '26%' }}>Sim</div>
+          <div className="absolute text-[9px] font-bold text-green-600" style={{ bottom: -18, left: isCondicao ? '26%' : '16%' }}>
+            {isCondicao ? 'Sim' : 'Respondeu'}
+          </div>
           <Handle
             type="source"
             position={Position.Bottom}
-            id="nao"
+            id={isCondicao ? 'nao' : 'timeout'}
             style={{
               background: '#ef4444',
               width: 12,
@@ -98,7 +102,9 @@ function BlocoNode({ data }) {
               left: '70%',
             }}
           />
-          <div className="absolute text-[9px] font-bold text-red-600" style={{ bottom: -18, left: '66%' }}>Não</div>
+          <div className="absolute text-[9px] font-bold text-red-600" style={{ bottom: -18, left: isCondicao ? '66%' : '52%' }}>
+            {isCondicao ? 'Nao' : 'Nao respondeu'}
+          </div>
         </>
       ) : (
         <Handle
@@ -178,6 +184,7 @@ export default function FunilEditor() {
       case 'delay': return `Aguardar ${bloco.data?.tempo || 0} ${bloco.data?.unidade || 'minutos'}`;
       case 'condicao': return `Se contém: ${bloco.data?.valorEsperado || '...'}`;
       case 'ia': return bloco.data?.mensagemBase?.substring(0, 50) || 'Mensagem com IA';
+      case 'esperar_resposta': return `Esperar ${bloco.data?.tempoTimeout || 30} ${bloco.data?.unidadeTimeout || 'minutos'}`;
       case 'comprovante': return 'Aguardar comprovante';
       case 'tag': return `Marcar tag`;
       case 'transferencia': return 'Transferir para humano';
@@ -474,6 +481,38 @@ export default function FunilEditor() {
                   placeholder="Mensagem antes de transferir"
                 />
               </div>
+            )}
+
+            {blocoSelecionado.data.blocoType === 'esperar_resposta' && (
+              <>
+                <div className="bg-blue-50 rounded-lg p-2 mb-1">
+                  <p className="text-xs text-blue-700">Aguarda a resposta do lead. Se responder, segue pelo caminho "Respondeu". Se nao responder no tempo definido, segue pelo caminho "Nao respondeu".</p>
+                </div>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Tempo limite</label>
+                    <input
+                      type="number"
+                      value={blocoSelecionado.data.tempoTimeout || 30}
+                      onChange={(e) => atualizarBloco('tempoTimeout', parseInt(e.target.value))}
+                      className="w-full rounded border-gray-300 text-xs"
+                      min={1}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Unidade</label>
+                    <select
+                      value={blocoSelecionado.data.unidadeTimeout || 'minutos'}
+                      onChange={(e) => atualizarBloco('unidadeTimeout', e.target.value)}
+                      className="w-full rounded border-gray-300 text-xs"
+                    >
+                      <option value="segundos">Segundos</option>
+                      <option value="minutos">Minutos</option>
+                      <option value="horas">Horas</option>
+                    </select>
+                  </div>
+                </div>
+              </>
             )}
 
             {blocoSelecionado.data.blocoType === 'comprovante' && (
