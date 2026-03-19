@@ -223,56 +223,57 @@ export default function Chips() {
           <p className="text-sm text-gray-400 mb-4">Clique em "Novo Chip" para adicionar seu primeiro WhatsApp</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
           {chips.map((chip) => {
             const isConectado = chip.statusConexao === 'open' || chip.statusConexao === 'connected';
             const dadosComp = comparativo.find((c) => c.chipId === chip.id);
             return (
-              <div key={chip.id} className="bg-white rounded-xl border border-gray-200 p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`p-2 rounded-lg ${isConectado ? 'bg-green-100' : 'bg-gray-100'}`}>
-                      <Smartphone className={isConectado ? 'text-green-600' : 'text-gray-400'} size={20} />
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-gray-800">{chip.nome}</h3>
-                      <div className="flex items-center gap-1">
-                        {isConectado ? <Wifi size={12} className="text-green-500" /> : <WifiOff size={12} className="text-gray-400" />}
-                        <span className={`text-xs ${getStatusColor(chip.statusConexao)}`}>{getStatusLabel(chip.statusConexao)}</span>
-                      </div>
+              <div key={chip.id} className="bg-white rounded-xl border border-gray-200 p-3 flex flex-col gap-2">
+                {/* Status + nome */}
+                <div className="flex items-center gap-2">
+                  <div className={`p-1.5 rounded-lg shrink-0 ${isConectado ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    <Smartphone className={isConectado ? 'text-green-600' : 'text-gray-400'} size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</h3>
+                    <div className="flex items-center gap-0.5">
+                      {isConectado ? <Wifi size={10} className="text-green-500" /> : <WifiOff size={10} className="text-gray-400" />}
+                      <span className={`text-[10px] ${getStatusColor(chip.statusConexao)}`}>{getStatusLabel(chip.statusConexao)}</span>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 mb-3">
-                  <div className="bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-gray-800">{dadosComp?.vendas || 0}</p>
-                    <p className="text-xs text-gray-500">Vendas</p>
+                {/* Stats */}
+                <div className="flex gap-1.5">
+                  <div className="flex-1 bg-gray-50 rounded-lg p-1.5 text-center">
+                    <p className="text-sm font-bold text-gray-800">{dadosComp?.vendas || 0}</p>
+                    <p className="text-[10px] text-gray-500">Vendas</p>
                   </div>
-                  <div className="bg-gray-50 rounded-lg p-2 text-center">
-                    <p className="text-lg font-bold text-green-600">{fmt(dadosComp?.valor)}</p>
-                    <p className="text-xs text-gray-500">Faturado</p>
+                  <div className="flex-1 bg-gray-50 rounded-lg p-1.5 text-center">
+                    <p className="text-sm font-bold text-green-600">{dadosComp?.leads || chip._count?.clientes || 0}</p>
+                    <p className="text-[10px] text-gray-500">Leads</p>
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                {/* Botões */}
+                <div className="flex gap-1">
                   <button
                     onClick={() => abrirModalConexao(chip.id, chip.nome)}
-                    className={`flex-1 flex items-center justify-center gap-1 text-xs py-2 rounded-lg font-medium ${isConectado ? 'bg-gray-50 text-gray-500 hover:bg-gray-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
+                    className={`flex-1 flex items-center justify-center gap-1 text-[11px] py-1.5 rounded-lg font-medium ${isConectado ? 'bg-gray-50 text-gray-500 hover:bg-gray-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
                   >
-                    <QrCode size={14} /> {isConectado ? 'Reconectar' : 'Conectar'}
+                    <QrCode size={11} /> {isConectado ? 'Recon.' : 'Conectar'}
                   </button>
                   <button
                     onClick={() => verRelatorio(chip.id)}
-                    className="flex items-center justify-center p-2 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100"
+                    className="flex items-center justify-center p-1.5 text-blue-500 bg-blue-50 rounded-lg hover:bg-blue-100"
                   >
-                    <BarChart3 size={14} />
+                    <BarChart3 size={12} />
                   </button>
                   <button
                     onClick={() => excluirChip(chip.id)}
-                    className="flex items-center justify-center p-2 text-gray-400 hover:text-red-500 bg-gray-50 rounded-lg"
+                    className="flex items-center justify-center p-1.5 text-gray-400 hover:text-red-500 bg-gray-50 rounded-lg"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={12} />
                   </button>
                 </div>
               </div>

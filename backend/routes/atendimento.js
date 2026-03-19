@@ -33,7 +33,7 @@ router.get('/', async (req, res, next) => {
       orderBy: { atualizadoEm: 'desc' },
     });
 
-    res.json(leads.map((l) => ({
+    const resultado = leads.map((l) => ({
       id: l.id,
       nome: l.nome,
       telefone: l.telefone,
@@ -42,7 +42,16 @@ router.get('/', async (req, res, next) => {
       ultimaMensagem: l.conversas[0] || null,
       atendimento: l.atendimentos[0] || null,
       emFunil: l.execucoes.length > 0,
-    })));
+    }));
+
+    // Ordenar por ultima mensagem mais recente
+    resultado.sort((a, b) => {
+      const ta = a.ultimaMensagem?.criadoEm ? new Date(a.ultimaMensagem.criadoEm) : new Date(0);
+      const tb = b.ultimaMensagem?.criadoEm ? new Date(b.ultimaMensagem.criadoEm) : new Date(0);
+      return tb - ta;
+    });
+
+    res.json(resultado);
   } catch (err) {
     next(err);
   }

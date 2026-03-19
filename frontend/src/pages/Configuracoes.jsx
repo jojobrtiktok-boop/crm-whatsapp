@@ -4,11 +4,10 @@ import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Configuracoes() {
-  const [abaAtiva, setAbaAtiva] = useState('geral');
+  const [abaAtiva, setAbaAtiva] = useState('funis');
   const { usuario } = useAuth();
 
   const abas = [
-    { key: 'geral', label: 'Geral', icon: Clock },
     { key: 'funis', label: 'Funis Ativos', icon: GitBranch },
     { key: 'usuarios', label: 'Usuarios', icon: Shield },
     { key: 'blacklist', label: 'Blacklist', icon: Ban },
@@ -35,7 +34,6 @@ export default function Configuracoes() {
         ))}
       </div>
 
-      {abaAtiva === 'geral' && <ConfigGeral />}
       {abaAtiva === 'funis' && <ConfigFunis />}
       {abaAtiva === 'usuarios' && <ConfigUsuarios />}
       {abaAtiva === 'blacklist' && <ConfigBlacklist />}
