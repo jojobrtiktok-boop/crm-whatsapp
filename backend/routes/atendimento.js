@@ -7,31 +7,42 @@ const prisma = new PrismaClient();
 
 router.use(autenticar);
 
-// GET /api/atendimento - Listar atendimentos
+// GET /api/atendimento - Inbox: todos os leads com conversas
 router.get('/', async (req, res, next) => {
   try {
-    const { status } = req.query;
-    const where = {};
-    if (status) where.status = status;
-
-    const atendimentos = await prisma.atendimento.findMany({
-      where,
+    const leads = await prisma.cliente.findMany({
+      where: { conversas: { some: {} } },
       include: {
-        cliente: {
-          select: {
-            id: true,
-            nome: true,
-            telefone: true,
-            status: true,
-            chipOrigemId: true,
-            chipOrigem: { select: { id: true, nome: true, numero: true } },
-          },
+        chipOrigem: { select: { id: true, nome: true, numero: true } },
+        conversas: {
+          orderBy: { criadoEm: 'desc' },
+          take: 1,
+          select: { conteudo: true, criadoEm: true, tipo: true, tipoMidia: true },
+        },
+        atendimentos: {
+          where: { status: { not: 'finalizado' } },
+          take: 1,
+          select: { id: true, status: true },
+        },
+        execucoes: {
+          where: { status: 'ativo' },
+          take: 1,
+          select: { id: true },
         },
       },
-      orderBy: { criadoEm: 'desc' },
+      orderBy: { atualizadoEm: 'desc' },
     });
 
-    res.json(atendimentos);
+    res.json(leads.map((l) => ({
+      id: l.id,
+      nome: l.nome,
+      telefone: l.telefone,
+      chipOrigem: l.chipOrigem,
+      chipOrigemId: l.chipOrigemId,
+      ultimaMensagem: l.conversas[0] || null,
+      atendimento: l.atendimentos[0] || null,
+      emFunil: l.execucoes.length > 0,
+    })));
   } catch (err) {
     next(err);
   }

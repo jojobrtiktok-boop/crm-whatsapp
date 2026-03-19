@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Send, User, Clock, CheckCircle, PhoneOff, GitBranch, Play, Smartphone } from 'lucide-react';
+import { Send, User, GitBranch, Play, Smartphone, Bot, HeadphonesIcon } from 'lucide-react';
 import api from '../api';
 import { useSocket, useSocketEvent } from '../hooks/useSocket';
 
 export default function Atendimento() {
-  const [atendimentos, setAtendimentos] = useState([]);
+  const [leads, setLeads] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
   const [conversas, setConversas] = useState([]);
   const [mensagem, setMensagem] = useState('');
@@ -14,57 +14,48 @@ export default function Atendimento() {
   const chatRef = useRef(null);
   const socket = useSocket();
 
-  async function carregarAtendimentos() {
+  async function carregarLeads() {
     try {
-      const [resAtend, resChips, resFunis] = await Promise.all([
+      const [resLeads, resChips, resFunis] = await Promise.all([
         api.get('/atendimento'),
         api.get('/chips'),
         api.get('/funis'),
       ]);
-      setAtendimentos(resAtend.data);
+      setLeads(resLeads.data);
       setChips(resChips.data);
       setFunis(resFunis.data);
     } catch (err) {
-      console.error('Erro ao carregar atendimentos:', err);
+      console.error('Erro ao carregar:', err);
     }
   }
 
-  useEffect(() => { carregarAtendimentos(); }, []);
+  useEffect(() => { carregarLeads(); }, []);
 
-  // Novo atendimento em tempo real
-  const handleNovoAtendimento = useCallback(() => { carregarAtendimentos(); }, []);
+  // Novo lead/atendimento em tempo real
+  const handleNovoAtendimento = useCallback(() => { carregarLeads(); }, []);
   useSocketEvent('atendimento:novo', handleNovoAtendimento);
+  useSocketEvent('lead:novo', handleNovoAtendimento);
 
   // Nova mensagem em tempo real
   const handleNovaMensagem = useCallback((data) => {
-    if (selecionado && data.clienteId === selecionado.clienteId) {
+    // Atualizar lista (ultima mensagem)
+    carregarLeads();
+    // Se for do lead selecionado, adicionar ao chat
+    if (selecionado && data.clienteId === selecionado.id) {
       setConversas((prev) => [...prev, data.conversa]);
       scrollParaBaixo();
     }
   }, [selecionado]);
   useSocketEvent('mensagem:nova', handleNovaMensagem);
 
-  async function selecionarAtendimento(atend) {
-    setSelecionado(atend);
-
-    // Assumir atendimento se está aguardando
-    if (atend.status === 'aguardando') {
-      try {
-        await api.put(`/atendimento/${atend.id}/assumir`);
-        carregarAtendimentos();
-      } catch (err) {
-        console.error('Erro ao assumir:', err);
-      }
-    }
-
-    // Carregar conversas do cliente
+  async function selecionarLead(lead) {
+    setSelecionado(lead);
     try {
-      const res = await api.get(`/clientes/${atend.clienteId}/conversas`);
+      const res = await api.get(`/clientes/${lead.id}/conversas`);
       setConversas(res.data);
       scrollParaBaixo();
-
-      if (socket) {
-        socket.emit('atendimento:assumir', { atendimentoId: atend.id });
+      if (socket && lead.atendimento) {
+        socket.emit('atendimento:assumir', { atendimentoId: lead.atendimento.id });
       }
     } catch (err) {
       console.error('Erro ao carregar conversas:', err);
@@ -73,34 +64,19 @@ export default function Atendimento() {
 
   async function enviarMensagem() {
     if (!mensagem.trim() || !selecionado) return;
-
-    const cliente = selecionado.cliente;
-    const chipId = selecionado.cliente?.chipOrigem?.id || chips[0]?.id;
-
+    const chipId = selecionado.chipOrigem?.id || selecionado.chipOrigemId || chips[0]?.id;
     try {
       await api.post('/whatsapp/enviar', {
-        clienteId: cliente.id,
+        clienteId: selecionado.id,
         chipId,
         mensagem: mensagem.trim(),
       });
-
       setMensagem('');
-      const res = await api.get(`/clientes/${cliente.id}/conversas`);
+      const res = await api.get(`/clientes/${selecionado.id}/conversas`);
       setConversas(res.data);
       scrollParaBaixo();
     } catch (err) {
       console.error('Erro ao enviar:', err);
-    }
-  }
-
-  async function finalizarAtendimento(atendId) {
-    try {
-      await api.put(`/atendimento/${atendId}/finalizar`);
-      setSelecionado(null);
-      setConversas([]);
-      carregarAtendimentos();
-    } catch (err) {
-      console.error('Erro ao finalizar:', err);
     }
   }
 
@@ -110,63 +86,84 @@ export default function Atendimento() {
     }, 100);
   }
 
-  // Buscar nome do chip pelo ID
   function getNomeChip(chipId) {
     const chip = chips.find((c) => c.id === chipId);
     return chip?.nome || chip?.numero?.slice(-4) || '';
   }
 
-  const atendimentosPendentes = atendimentos.filter((a) => a.status !== 'finalizado');
+  function formatarHora(data) {
+    return new Date(data).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function formatarData(data) {
+    const d = new Date(data);
+    const hoje = new Date();
+    if (d.toDateString() === hoje.toDateString()) return formatarHora(data);
+    return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  }
 
   return (
     <div className="h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Lista de atendimentos */}
+      {/* Lista de leads */}
       <div className="w-80 border-r border-gray-200 flex flex-col">
         <div className="p-4 border-b border-gray-200">
-          <h2 className="font-semibold text-gray-800">Atendimentos</h2>
-          <p className="text-xs text-gray-500 mt-1">{atendimentosPendentes.length} em aberto</p>
+          <h2 className="font-semibold text-gray-800">Painel de Controle</h2>
+          <p className="text-xs text-gray-500 mt-1">{leads.length} conversas</p>
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {atendimentosPendentes.map((atend) => (
+          {leads.map((lead) => (
             <div
-              key={atend.id}
-              onClick={() => selecionarAtendimento(atend)}
+              key={lead.id}
+              onClick={() => selecionarLead(lead)}
               className={`flex items-center gap-3 px-4 py-3 cursor-pointer border-b border-gray-50 hover:bg-gray-50 ${
-                selecionado?.id === atend.id ? 'bg-primary-50' : ''
+                selecionado?.id === lead.id ? 'bg-primary-50' : ''
               }`}
             >
-              <div className="bg-gray-200 rounded-full p-2">
+              <div className="bg-gray-200 rounded-full p-2 shrink-0">
                 <User size={16} className="text-gray-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 truncate">
-                  {atend.cliente?.nome || 'Sem nome'}
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <p className="text-xs text-gray-500 truncate">{atend.cliente?.telefone}</p>
-                  {atend.cliente?.chipOrigem && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md shrink-0">
-                      <Smartphone size={9} />
-                      {atend.cliente.chipOrigem.nome || atend.cliente.chipOrigem.numero?.slice(-4)}
+                <div className="flex items-center justify-between gap-1">
+                  <p className="text-sm font-medium text-gray-800 truncate">
+                    {lead.nome || lead.telefone}
+                  </p>
+                  {lead.ultimaMensagem && (
+                    <span className="text-[10px] text-gray-400 shrink-0">
+                      {formatarData(lead.ultimaMensagem.criadoEm)}
                     </span>
                   )}
                 </div>
-              </div>
-              <div>
-                {atend.status === 'aguardando' ? (
-                  <Clock size={14} className="text-yellow-500" />
-                ) : (
-                  <CheckCircle size={14} className="text-green-500" />
-                )}
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  {lead.chipOrigem && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md shrink-0">
+                      <Smartphone size={9} />
+                      {lead.chipOrigem.nome || lead.chipOrigem.numero?.slice(-4)}
+                    </span>
+                  )}
+                  {lead.emFunil ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-blue-100 text-blue-700 text-[10px] font-semibold rounded-md shrink-0">
+                      <Bot size={9} /> Bot
+                    </span>
+                  ) : lead.atendimento ? (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-orange-100 text-orange-700 text-[10px] font-semibold rounded-md shrink-0">
+                      <HeadphonesIcon size={9} /> Humano
+                    </span>
+                  ) : null}
+                  {lead.ultimaMensagem && (
+                    <p className="text-xs text-gray-400 truncate">
+                      {lead.ultimaMensagem.conteudo || `[${lead.ultimaMensagem.tipoMidia}]`}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           ))}
 
-          {atendimentosPendentes.length === 0 && (
+          {leads.length === 0 && (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <User size={32} className="mb-2 opacity-50" />
-              <p className="text-sm">Nenhum atendimento</p>
+              <p className="text-sm">Nenhuma conversa ainda</p>
             </div>
           )}
         </div>
@@ -175,34 +172,26 @@ export default function Atendimento() {
       {/* Chat */}
       {selecionado ? (
         <div className="flex-1 flex flex-col">
-          {/* Header do chat */}
+          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div>
-              <h3 className="font-semibold text-gray-800">{selecionado.cliente?.nome || 'Sem nome'}</h3>
+              <h3 className="font-semibold text-gray-800">{selecionado.nome || 'Sem nome'}</h3>
               <div className="flex items-center gap-2">
-                <p className="text-xs text-gray-500">{selecionado.cliente?.telefone}</p>
-                {selecionado.cliente?.chipOrigem && (
+                <p className="text-xs text-gray-500">{selecionado.telefone}</p>
+                {selecionado.chipOrigem && (
                   <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md">
                     <Smartphone size={10} />
-                    {selecionado.cliente.chipOrigem.nome || selecionado.cliente.chipOrigem.numero?.slice(-4)}
+                    {selecionado.chipOrigem.nome || selecionado.chipOrigem.numero?.slice(-4)}
                   </span>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setModalFunil(true)}
-                className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 px-3 py-1.5 bg-primary-50 rounded-lg"
-              >
-                <GitBranch size={14} /> Ativar Funil
-              </button>
-              <button
-                onClick={() => finalizarAtendimento(selecionado.id)}
-                className="flex items-center gap-1 text-xs text-red-500 hover:text-red-700 px-3 py-1.5 bg-red-50 rounded-lg"
-              >
-                <PhoneOff size={14} /> Finalizar
-              </button>
-            </div>
+            <button
+              onClick={() => setModalFunil(true)}
+              className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 px-3 py-1.5 bg-primary-50 rounded-lg"
+            >
+              <GitBranch size={14} /> Ativar Funil
+            </button>
           </div>
 
           {/* Mensagens */}
@@ -221,9 +210,7 @@ export default function Atendimento() {
                 >
                   <p>{msg.conteudo || `[${msg.tipoMidia}]`}</p>
                   <div className={`flex items-center gap-1.5 mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
-                    <span className="text-xs">
-                      {new Date(msg.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                    <span className="text-xs">{formatarHora(msg.criadoEm)}</span>
                     {msg.tipo === 'recebida' && msg.chipId && (
                       <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 text-[9px] font-semibold rounded">
                         <Smartphone size={8} />
@@ -236,7 +223,7 @@ export default function Atendimento() {
             ))}
           </div>
 
-          {/* Input de mensagem */}
+          {/* Input */}
           <div className="p-4 border-t border-gray-200">
             <div className="flex gap-2">
               <input
@@ -260,8 +247,8 @@ export default function Atendimento() {
       ) : (
         <div className="flex-1 flex items-center justify-center text-gray-400">
           <div className="text-center">
-            <MessageIcon size={48} className="mx-auto mb-3 opacity-50" />
-            <p>Selecione um atendimento</p>
+            <User size={48} className="mx-auto mb-3 opacity-50" />
+            <p>Selecione uma conversa</p>
           </div>
         </div>
       )}
@@ -271,7 +258,7 @@ export default function Atendimento() {
         <ModalAtivarFunil
           funis={funis}
           chips={chips}
-          clienteId={selecionado.clienteId}
+          clienteId={selecionado.id}
           onClose={() => setModalFunil(false)}
         />
       )}
@@ -285,10 +272,7 @@ function ModalAtivarFunil({ funis, chips, clienteId, onClose }) {
   const [ativando, setAtivando] = useState(false);
 
   async function ativar() {
-    if (!funilId || !chipId) {
-      alert('Selecione um funil e um chip');
-      return;
-    }
+    if (!funilId || !chipId) { alert('Selecione um funil e um chip'); return; }
     setAtivando(true);
     try {
       await api.post('/funis/executar', {
@@ -312,48 +296,26 @@ function ModalAtivarFunil({ funis, chips, clienteId, onClose }) {
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Funil</label>
-            <select
-              value={funilId}
-              onChange={(e) => setFunilId(e.target.value)}
-              className="w-full rounded-lg border-gray-300 text-sm"
-            >
+            <select value={funilId} onChange={(e) => setFunilId(e.target.value)} className="w-full rounded-lg border-gray-300 text-sm">
               <option value="">Selecione o funil</option>
-              {funis.map((f) => (
-                <option key={f.id} value={f.id}>{f.nome}</option>
-              ))}
+              {funis.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Chip para envio</label>
-            <select
-              value={chipId}
-              onChange={(e) => setChipId(e.target.value)}
-              className="w-full rounded-lg border-gray-300 text-sm"
-            >
+            <select value={chipId} onChange={(e) => setChipId(e.target.value)} className="w-full rounded-lg border-gray-300 text-sm">
               <option value="">Selecione o chip</option>
-              {chips.map((c) => (
-                <option key={c.id} value={c.id}>{c.nome}</option>
-              ))}
+              {chips.map((c) => <option key={c.id} value={c.id}>{c.nome}</option>)}
             </select>
           </div>
         </div>
         <div className="flex gap-2 mt-4">
-          <button onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg text-sm">
-            Cancelar
-          </button>
-          <button
-            onClick={ativar}
-            disabled={ativando}
-            className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-          >
+          <button onClick={onClose} className="flex-1 py-2 bg-gray-100 rounded-lg text-sm">Cancelar</button>
+          <button onClick={ativar} disabled={ativando} className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
             <Play size={14} /> {ativando ? 'Ativando...' : 'Ativar Funil'}
           </button>
         </div>
       </div>
     </div>
   );
-}
-
-function MessageIcon(props) {
-  return <User {...props} />;
 }
