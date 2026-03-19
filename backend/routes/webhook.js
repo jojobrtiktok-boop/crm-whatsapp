@@ -42,7 +42,13 @@ async function processarMensagem(evento, instancia) {
   // Ignorar mensagens enviadas pelo próprio bot
   if (mensagem.key?.fromMe) return;
 
-  const telefone = (mensagem.key?.remoteJid || '').replace('@s.whatsapp.net', '').replace('@g.us', '');
+  const remoteJid = mensagem.key?.remoteJid || '';
+  // Pular grupos e newsletters
+  if (remoteJid.includes('@g.us') || remoteJid.includes('@newsletter')) return;
+  // Para @s.whatsapp.net: extrair só o número. Para @lid: guardar JID completo (não tem número real)
+  const telefone = remoteJid.includes('@s.whatsapp.net')
+    ? remoteJid.replace('@s.whatsapp.net', '')
+    : remoteJid;
   if (!telefone || telefone.includes('status')) return;
 
   // Verificar blacklist
