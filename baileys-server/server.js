@@ -380,9 +380,13 @@ async function startBaileysSession(sessionName) {
 
   // Mensagens recebidas
   socket.ev.on('messages.upsert', async ({ messages, type }) => {
+    console.log(`[${sessionName}] messages.upsert type=${type} count=${messages.length}`);
     if (type !== 'notify') return;
     const webhookUrl = sess.webhookUrl;
-    if (!webhookUrl) return;
+    if (!webhookUrl) {
+      console.log(`[${sessionName}] Sem webhookUrl configurado!`);
+      return;
+    }
 
     for (const msg of messages) {
       if (msg.key.fromMe) continue;

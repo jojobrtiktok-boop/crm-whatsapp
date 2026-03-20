@@ -37,6 +37,7 @@ router.post('/evolution', async (req, res) => {
 
     // === Formato WPPConnect ===
     } else if (evento.event === 'onmessage' && evento.data) {
+      console.log(`[Webhook] onmessage de ${evento.data.from} via ${instancia} fromMe=${evento.data.fromMe}`);
       if (!evento.data.fromMe) {
         await processarMensagemWPP(evento.data, instancia);
       }

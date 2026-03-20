@@ -20,10 +20,10 @@ async function obterProximoChip() {
   return chips[ultimoChipIndex];
 }
 
-// Busca chip pela instância da Evolution API
+// Busca chip pela instância da Evolution API (inclui inativos para receber mensagens)
 async function buscarChipPorInstancia(instancia) {
   return prisma.chip.findFirst({
-    where: { instanciaEvolution: instancia, ativo: true },
+    where: { instanciaEvolution: instancia },
   });
 }
 
