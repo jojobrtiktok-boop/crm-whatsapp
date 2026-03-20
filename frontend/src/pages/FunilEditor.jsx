@@ -18,7 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   Save, ArrowLeft, MessageSquare, Image, Mic, Video,
-  Clock, GitBranch, Bot, Tag, MessageCircle, Play, Upload, X,
+  Clock, GitBranch, Bot, Tag, MessageCircle, Play, Upload, X, FileText,
 } from 'lucide-react';
 import api from '../api';
 
@@ -28,6 +28,7 @@ const TIPOS_BLOCOS = [
   { type: 'imagem', label: 'Imagem', icon: Image, cor: '#8b5cf6' },
   { type: 'audio', label: 'Audio', icon: Mic, cor: '#ec4899' },
   { type: 'video', label: 'Video', icon: Video, cor: '#f59e0b' },
+  { type: 'documento', label: 'PDF/Doc', icon: FileText, cor: '#dc2626' },
   { type: 'delay', label: 'Delay', icon: Clock, cor: '#6b7280' },
   { type: 'condicao', label: 'Condicao', icon: GitBranch, cor: '#ef4444' },
   { type: 'ia', label: 'IA', icon: Bot, cor: '#06b6d4' },
@@ -103,14 +104,16 @@ function BlocoNode({ data }) {
             id={isCondicao ? 'sim' : 'respondeu'}
             style={{
               background: '#22c55e',
-              width: 12,
-              height: 12,
+              width: 14,
+              height: 14,
               border: '2px solid white',
-              bottom: -6,
+              bottom: -7,
               left: '30%',
+              zIndex: 20,
+              cursor: 'crosshair',
             }}
           />
-          <div className="absolute text-[9px] font-bold text-green-600" style={{ bottom: -18, left: isCondicao ? '26%' : '16%' }}>
+          <div className="absolute text-[9px] font-bold text-green-600" style={{ bottom: -20, left: isCondicao ? '26%' : '16%', pointerEvents: 'none', zIndex: 1 }}>
             {isCondicao ? 'Sim' : 'Respondeu'}
           </div>
           <Handle
@@ -119,14 +122,16 @@ function BlocoNode({ data }) {
             id={isCondicao ? 'nao' : 'timeout'}
             style={{
               background: '#ef4444',
-              width: 12,
-              height: 12,
+              width: 14,
+              height: 14,
               border: '2px solid white',
-              bottom: -6,
+              bottom: -7,
               left: '70%',
+              zIndex: 20,
+              cursor: 'crosshair',
             }}
           />
-          <div className="absolute text-[9px] font-bold text-red-600" style={{ bottom: -18, left: isCondicao ? '66%' : '52%' }}>
+          <div className="absolute text-[9px] font-bold text-red-600" style={{ bottom: -20, left: isCondicao ? '66%' : '52%', pointerEvents: 'none', zIndex: 1 }}>
             {isCondicao ? 'Nao' : 'Nao respondeu'}
           </div>
         </>
@@ -248,6 +253,7 @@ export default function FunilEditor() {
       case 'imagem': return bloco.data?.nomeArquivo || bloco.data?.url || 'Enviar imagem';
       case 'audio': return bloco.data?.nomeArquivo || bloco.data?.url || 'Enviar audio';
       case 'video': return bloco.data?.nomeArquivo || bloco.data?.url || 'Enviar video';
+      case 'documento': return bloco.data?.nomeArquivo || bloco.data?.nomeExibido || bloco.data?.url || 'Enviar PDF/Doc';
       case 'delay': return `Aguardar ${bloco.data?.tempo || 0} ${bloco.data?.unidade || 'minutos'}`;
       case 'condicao': return `Se contem: ${bloco.data?.valorEsperado || '...'}`;
       case 'ia': return bloco.data?.mensagemBase?.substring(0, 50) || 'Mensagem com IA';
@@ -271,13 +277,14 @@ export default function FunilEditor() {
 
   function adicionarBloco(tipo) {
     const novoId = `bloco-${Date.now()}`;
+    const offset = Math.floor(Math.random() * 40) - 20;
 
     setNodes((nds) => {
       const ultimoBloco = getUltimoBloco(nds);
-      const yPos = ultimoBloco ? ultimoBloco.position.y + 130 : 50;
-      const xPos = ultimoBloco ? ultimoBloco.position.x : 250;
+      const yPos = ultimoBloco ? ultimoBloco.position.y + 150 : 50;
+      const xPos = (ultimoBloco ? ultimoBloco.position.x : 250) + offset;
 
-      const novoNode = {
+      return [...nds, {
         id: novoId,
         type: 'blocoNode',
         position: { x: xPos, y: yPos },
@@ -285,22 +292,7 @@ export default function FunilEditor() {
           blocoType: tipo,
           preview: TIPOS_BLOCOS.find((t) => t.type === tipo)?.label,
         },
-      };
-
-      // Conectar ao bloco anterior automaticamente (se nao for condicao/esperar_resposta)
-      if (ultimoBloco && ultimoBloco.data.blocoType !== 'condicao' && ultimoBloco.data.blocoType !== 'esperar_resposta') {
-        const novaEdge = {
-          id: `edge-${Date.now()}`,
-          source: ultimoBloco.id,
-          target: novoId,
-          type: 'deletable',
-          animated: true,
-          style: { stroke: '#94a3b8' },
-        };
-        setEdges((eds) => [...eds, novaEdge]);
-      }
-
-      return [...nds, novoNode];
+      }];
     });
   }
 
@@ -621,6 +613,63 @@ export default function FunilEditor() {
                     value={blocoSelecionado.data.legenda || ''}
                     onChange={(e) => atualizarBloco('legenda', e.target.value)}
                     className="w-full rounded border-gray-300 text-xs"
+                  />
+                </div>
+              </>
+            )}
+
+            {/* Documento/PDF */}
+            {blocoSelecionado.data.blocoType === 'documento' && (
+              <>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Enviar PDF do PC</label>
+                  <div
+                    onClick={() => fileInputRef.current?.click()}
+                    className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-red-400 hover:bg-red-50 transition-colors"
+                  >
+                    {uploading ? (
+                      <div className="text-xs text-gray-500">Enviando...</div>
+                    ) : blocoSelecionado.data.nomeArquivo ? (
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-green-600 truncate">{blocoSelecionado.data.nomeArquivo}</span>
+                        <button onClick={(e) => { e.stopPropagation(); atualizarBloco('url', ''); atualizarBloco('nomeArquivo', ''); }} className="text-red-400 hover:text-red-600">
+                          <X size={12} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        <FileText size={20} className="text-gray-400" />
+                        <span className="text-xs text-gray-500">Clique para enviar PDF</span>
+                        <span className="text-[10px] text-gray-400">PDF, DOC, DOCX</span>
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={(e) => uploadArquivo(e.target.files[0])}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ou cole a URL do documento</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.url || ''}
+                    onChange={(e) => atualizarBloco('url', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Nome exibido no WhatsApp</label>
+                  <input
+                    type="text"
+                    value={blocoSelecionado.data.nomeExibido || ''}
+                    onChange={(e) => atualizarBloco('nomeExibido', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                    placeholder="Ex: Contrato.pdf"
                   />
                 </div>
               </>
