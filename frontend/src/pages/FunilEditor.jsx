@@ -277,14 +277,13 @@ export default function FunilEditor() {
 
   function adicionarBloco(tipo) {
     const novoId = `bloco-${Date.now()}`;
-    const offset = Math.floor(Math.random() * 40) - 20;
 
     setNodes((nds) => {
       const ultimoBloco = getUltimoBloco(nds);
-      const yPos = ultimoBloco ? ultimoBloco.position.y + 150 : 50;
-      const xPos = (ultimoBloco ? ultimoBloco.position.x : 250) + offset;
+      const yPos = ultimoBloco ? ultimoBloco.position.y + 140 : 150;
+      const xPos = ultimoBloco ? ultimoBloco.position.x : 250;
 
-      return [...nds, {
+      const novoNode = {
         id: novoId,
         type: 'blocoNode',
         position: { x: xPos, y: yPos },
@@ -292,7 +291,24 @@ export default function FunilEditor() {
           blocoType: tipo,
           preview: TIPOS_BLOCOS.find((t) => t.type === tipo)?.label,
         },
-      }];
+      };
+
+      // Auto-conectar ao último bloco (exceto condicao/esperar_resposta que têm múltiplas saídas)
+      if (ultimoBloco && ultimoBloco.data.blocoType !== 'condicao' && ultimoBloco.data.blocoType !== 'esperar_resposta') {
+        setEdges((eds) => [...eds, {
+          id: `edge-${Date.now()}`,
+          source: ultimoBloco.id,
+          target: novoId,
+          type: 'deletable',
+          animated: true,
+          style: { stroke: '#94a3b8' },
+        }]);
+      }
+
+      // Auto-selecionar o novo bloco no painel direito
+      setTimeout(() => setBlocoSelecionado(novoNode), 50);
+
+      return [...nds, novoNode];
     });
   }
 
@@ -452,7 +468,7 @@ export default function FunilEditor() {
                 <textarea
                   value={blocoSelecionado.data.mensagem || ''}
                   onChange={(e) => atualizarBloco('mensagem', e.target.value)}
-                  className="w-full rounded border-gray-300 text-xs"
+                  className="w-full rounded border-gray-300 text-xs resize-y min-h-[80px]"
                   rows={4}
                   placeholder="Use {nome} para o nome do lead"
                 />
@@ -683,7 +699,7 @@ export default function FunilEditor() {
                   <textarea
                     value={blocoSelecionado.data.mensagemBase || ''}
                     onChange={(e) => atualizarBloco('mensagemBase', e.target.value)}
-                    className="w-full rounded border-gray-300 text-xs"
+                    className="w-full rounded border-gray-300 text-xs resize-y min-h-[60px]"
                     rows={3}
                   />
                 </div>
@@ -705,7 +721,7 @@ export default function FunilEditor() {
                   <textarea
                     value={blocoSelecionado.data.contexto || ''}
                     onChange={(e) => atualizarBloco('contexto', e.target.value)}
-                    className="w-full rounded border-gray-300 text-xs"
+                    className="w-full rounded border-gray-300 text-xs resize-y min-h-[50px]"
                     rows={2}
                     placeholder="Info sobre o produto/servico"
                   />
