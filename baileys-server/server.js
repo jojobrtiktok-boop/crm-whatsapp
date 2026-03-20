@@ -257,7 +257,7 @@ app.post('/api/:session/send-file-base64', verifyToken, async (req, res) => {
     const msgContent = isVideo
       ? { video: fileBuffer, caption: caption || '', fileName: filename }
       : isAudio
-      ? { audio: fileBuffer, mimetype, ptt: false }
+      ? { audio: fileBuffer, mimetype, ptt: true }
       : { document: fileBuffer, mimetype, fileName: filename, caption: caption || '' };
 
     const result = await sessions[session].socket.sendMessage(jid, msgContent);

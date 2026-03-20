@@ -254,7 +254,10 @@ export default function Chips() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-1 group">
-                        <h3 className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</h3>
+                        <div className="flex flex-col min-w-0">
+                          <h3 className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</h3>
+                          {chip.numero && <span className="text-[10px] text-gray-400">{chip.numero}</span>}
+                        </div>
                         <button
                           onClick={() => setRenomeando({ id: chip.id, nome: chip.nome })}
                           className="opacity-0 group-hover:opacity-100 text-gray-400 hover:text-primary-600 shrink-0"
