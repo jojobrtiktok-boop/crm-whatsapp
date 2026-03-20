@@ -18,6 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 const pino = require('pino');
 const mime = require('mime-types');
+const { execSync } = require('child_process');
 
 const app = express();
 app.use(express.json({ limit: '100mb' }));
@@ -227,7 +228,23 @@ app.post('/api/:session/send-voice', verifyToken, async (req, res) => {
   try {
     const jid = formatJid(phone);
     const b64 = base64.includes(',') ? base64.split(',')[1] : base64;
-    const audioBuffer = Buffer.from(b64, 'base64');
+    const inputBuffer = Buffer.from(b64, 'base64');
+
+    // Converter para OGG/Opus via ffmpeg (garante compatibilidade com WhatsApp PTT)
+    let audioBuffer = inputBuffer;
+    const tmpIn = path.join(AUTH_DIR, `tmp_in_${Date.now()}`);
+    const tmpOut = path.join(AUTH_DIR, `tmp_out_${Date.now()}.ogg`);
+    try {
+      fs.writeFileSync(tmpIn, inputBuffer);
+      execSync(`ffmpeg -y -i "${tmpIn}" -c:a libopus -b:a 32k -ac 1 -ar 48000 "${tmpOut}" 2>/dev/null`);
+      audioBuffer = fs.readFileSync(tmpOut);
+    } catch (e) {
+      console.error(`[${session}] ffmpeg falhou, usando buffer original:`, e.message);
+    } finally {
+      try { fs.unlinkSync(tmpIn); } catch {}
+      try { fs.unlinkSync(tmpOut); } catch {}
+    }
+
     const result = await sessions[session].socket.sendMessage(jid, {
       audio: audioBuffer,
       ptt: true,

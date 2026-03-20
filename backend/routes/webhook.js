@@ -368,11 +368,9 @@ async function processarMensagemWPP(data, instancia) {
   } else if (nome && !cliente.nome) {
     cliente = await prisma.cliente.update({ where: { id: cliente.id }, data: { nome } });
   }
-  if (!cliente) return;
-  if (isNovo) {
-    console.log(`[Webhook] Novo lead WPP: ${telefone} (${cliente.nome || 'sem nome'})`);
-    emitir('lead:novo', cliente, chip.contaId);
-  }
+  if (!cliente) { console.log(`[Webhook] Cliente não encontrado/criado para ${telefone} conta:${chip.contaId}`); return; }
+  console.log(`[Webhook] Cliente id:${cliente.id} telefone:${telefone} conta:${chip.contaId} novo:${isNovo}`);
+  if (isNovo) emitir('lead:novo', cliente, chip.contaId);
 
   // Extrair conteúdo e tipo de mídia
   let conteudo = data.body || data.caption || '';
@@ -413,6 +411,7 @@ async function processarMensagemWPP(data, instancia) {
     prisma.cliente.update({ where: { id: cliente.id }, data: { atualizadoEm: new Date() } }),
   ]);
 
+  console.log(`[Webhook] Conversa criada id:${conversa.id} para cliente:${cliente.id} conta:${chip.contaId}`);
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
   // Analisar imagem com IA (possível comprovante de pagamento)
