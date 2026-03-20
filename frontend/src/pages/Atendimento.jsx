@@ -80,24 +80,24 @@ export default function Atendimento() {
 
   async function carregarLeads() {
     try {
-      const [resLeads, resChips, resFunis, resPagos] = await Promise.all([
+      const [resLeads, resChips, resFunis] = await Promise.all([
         api.get('/atendimento'),
         api.get('/chips'),
         api.get('/funis'),
-        api.get('/atendimento/pagos'),
       ]);
       setLeads(resLeads.data);
       setChips(resChips.data);
       setFunis(resFunis.data);
-      setLeadsPagos(resPagos.data);
       resLeads.data.forEach((lead) => {
         api.get(`/clientes/${lead.id}/foto`).then((r) => {
           if (r.data?.url) setFotos((prev) => ({ ...prev, [lead.id]: r.data.url }));
         }).catch(() => {});
       });
     } catch (err) {
-      console.error('Erro ao carregar:', err);
+      console.error('Erro ao carregar leads:', err);
     }
+    // Pagos é não-crítico — não bloqueia o atendimento se falhar
+    api.get('/atendimento/pagos').then((r) => setLeadsPagos(r.data)).catch(() => {});
   }
 
   useEffect(() => { carregarLeads(); }, []);

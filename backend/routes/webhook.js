@@ -141,17 +141,20 @@ async function processarMensagemWaha(payload, instancia) {
     }
   }
 
-  // Salvar conversa
-  const conversa = await prisma.conversa.create({
-    data: {
-      clienteId: cliente.id,
-      chipId: chip.id,
-      tipo: 'recebida',
-      conteudo,
-      tipoMidia,
-      midiaUrl,
-    },
-  });
+  // Salvar conversa e atualizar timestamp do cliente
+  const [conversa] = await Promise.all([
+    prisma.conversa.create({
+      data: {
+        clienteId: cliente.id,
+        chipId: chip.id,
+        tipo: 'recebida',
+        conteudo,
+        tipoMidia,
+        midiaUrl,
+      },
+    }),
+    prisma.cliente.update({ where: { id: cliente.id }, data: { atualizadoEm: new Date() } }),
+  ]);
 
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
@@ -268,9 +271,12 @@ async function processarMensagem(evento, instancia) {
   else if (msgData.videoMessage) tipoMidia = 'video';
   else if (msgData.documentMessage) tipoMidia = 'documento';
 
-  const conversa = await prisma.conversa.create({
-    data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia },
-  });
+  const [conversa] = await Promise.all([
+    prisma.conversa.create({
+      data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia },
+    }),
+    prisma.cliente.update({ where: { id: cliente.id }, data: { atualizadoEm: new Date() } }),
+  ]);
 
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
@@ -398,10 +404,13 @@ async function processarMensagemWPP(data, instancia) {
     }
   }
 
-  // Salvar conversa
-  const conversa = await prisma.conversa.create({
-    data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia, midiaUrl },
-  });
+  // Salvar conversa e atualizar timestamp do cliente
+  const [conversa] = await Promise.all([
+    prisma.conversa.create({
+      data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia, midiaUrl },
+    }),
+    prisma.cliente.update({ where: { id: cliente.id }, data: { atualizadoEm: new Date() } }),
+  ]);
 
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
