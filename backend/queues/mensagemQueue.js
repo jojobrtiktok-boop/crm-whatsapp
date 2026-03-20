@@ -1,5 +1,6 @@
 // Processador da fila de envio de mensagens
 const { mensagemQueue } = require('./setup');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const { enviarTexto, enviarImagem, enviarAudio, enviarVideo, enviarDocumento } = require('../services/evolutionApi');
 const { PrismaClient } = require('@prisma/client');
 
@@ -62,6 +63,9 @@ mensagemQueue.process(async (job) => {
     default:
       console.log(`[MensagemQueue] Tipo desconhecido: ${tipo}`);
   }
+
+  // Delay de 2 segundos entre mensagens para não parecer robô
+  if (resultado) await sleep(2000);
 
   // Salvar wamid para rastrear recibos de leitura
   if (resultado && conversaId) {

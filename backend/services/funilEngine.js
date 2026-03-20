@@ -115,6 +115,22 @@ async function executarBloco(execucaoId, bloco, funil) {
       break;
     }
 
+    case 'documento': {
+      const nomeDoc = bloco.data.nomeExibido || bloco.data.nomeArquivo || 'documento.pdf';
+      const conversaDoc = await criarConversa(cliente.id, chip.id, nomeDoc, 'documento', bloco.data.url || null, chip.contaId);
+      await mensagemQueue.add({
+        tipo: 'documento',
+        instancia: chip.instanciaEvolution,
+        telefone: cliente.telefone,
+        url: bloco.data.url,
+        nomeArquivo: nomeDoc,
+        execucaoId,
+        conversaId: conversaDoc?.id,
+      });
+      await avancarParaProximoBloco(execucaoId, bloco.id, funil);
+      break;
+    }
+
     case 'botoes': {
       const msg = bloco.data.mensagem.replace('{nome}', cliente.nome || 'amigo');
       // Enviar mensagem com opções listadas como texto

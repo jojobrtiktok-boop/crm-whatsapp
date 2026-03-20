@@ -252,9 +252,12 @@ app.post('/api/:session/send-file-base64', verifyToken, async (req, res) => {
     const ext = path.extname(filename || '').toLowerCase();
     const mimetype = mime.lookup(filename) || 'application/octet-stream';
     const isVideo = ['.mp4', '.avi', '.mov'].includes(ext);
+    const isAudio = ['.mp3', '.wav', '.m4a', '.aac', '.ogg', '.opus'].includes(ext);
 
     const msgContent = isVideo
       ? { video: fileBuffer, caption: caption || '', fileName: filename }
+      : isAudio
+      ? { audio: fileBuffer, mimetype, ptt: false }
       : { document: fileBuffer, mimetype, fileName: filename, caption: caption || '' };
 
     const result = await sessions[session].socket.sendMessage(jid, msgContent);

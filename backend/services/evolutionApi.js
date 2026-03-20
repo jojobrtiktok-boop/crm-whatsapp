@@ -101,15 +101,30 @@ async function enviarImagem(sessao, telefone, imagemUrl, legenda = '') {
   return response.data;
 }
 
-// Enviar áudio PTT
+// Enviar áudio (PTT para OGG/Opus, ou áudio regular para MP3/WAV/M4A)
 async function enviarAudio(sessao, telefone, audioUrl) {
   const api = await apiFor(sessao);
   const isLocal = audioUrl && !audioUrl.startsWith('http');
-  const response = await api.post(`/api/${sessao}/send-voice`, {
-    phone: formatPhone(telefone),
-    base64: isLocal ? toDataUri(audioUrl) : audioUrl,
-  });
-  return response.data;
+  const ext = path.extname(audioUrl || '').toLowerCase();
+  const isOgg = ['.ogg', '.opus'].includes(ext);
+
+  if (isOgg) {
+    const response = await api.post(`/api/${sessao}/send-voice`, {
+      phone: formatPhone(telefone),
+      base64: isLocal ? toDataUri(audioUrl) : audioUrl,
+    });
+    return response.data;
+  } else {
+    // MP3, WAV, M4A etc → send-file-base64 como áudio
+    const filename = path.basename(audioUrl || 'audio.mp3');
+    const response = await api.post(`/api/${sessao}/send-file-base64`, {
+      phone: formatPhone(telefone),
+      base64: isLocal ? toDataUri(audioUrl) : audioUrl,
+      filename,
+      caption: '',
+    });
+    return response.data;
+  }
 }
 
 // Enviar vídeo
