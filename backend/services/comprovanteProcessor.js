@@ -162,14 +162,16 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
       }
 
-      // Aplicar etiqueta no WhatsApp se configurado
+      // Aplicar etiqueta em todos os chips ativos da conta
       if (cfgMap.etiqueta_pagamento_ativa === 'true' && cfgMap.etiqueta_pagamento_id) {
-        try {
-          const instanciaEtiqueta = cfgMap.etiqueta_pagamento_instancia || instanciaEvolution;
-          await aplicarEtiqueta(instanciaEtiqueta, telefoneCliente, cfgMap.etiqueta_pagamento_id);
-          console.log(`[Comprovante] Etiqueta ${cfgMap.etiqueta_pagamento_id} aplicada a ${telefoneCliente}`);
-        } catch (err) {
-          console.error('[Comprovante] Erro ao aplicar etiqueta:', err.message);
+        const chipsAtivos = await prisma.chip.findMany({ where: { contaId, ativo: true } });
+        for (const c of chipsAtivos) {
+          try {
+            await aplicarEtiqueta(c.instanciaEvolution, telefoneCliente, cfgMap.etiqueta_pagamento_id);
+            console.log(`[Comprovante] Etiqueta ${cfgMap.etiqueta_pagamento_id} aplicada em ${c.instanciaEvolution}`);
+          } catch (err) {
+            console.error(`[Comprovante] Erro ao aplicar etiqueta no chip ${c.instanciaEvolution}:`, err.message);
+          }
         }
       }
     } else {
