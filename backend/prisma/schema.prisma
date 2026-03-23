@@ -164,7 +164,9 @@ model FunilExecucao {
 model Venda {
   id           Int      @id @default(autoincrement())
   clienteId    Int      @map("cliente_id")
-  chipId       Int      @map("chip_id")
+  contaId      Int      @map("conta_id")
+  chipId       Int?     @map("chip_id")
+  chipNome     String?  @map("chip_nome")
   valor        Float
   status       String   @default("pendente") // pendente, confirmado, cancelado, reembolsado
   descricao    String?
@@ -172,10 +174,11 @@ model Venda {
   atualizadoEm DateTime @updatedAt @map("atualizado_em")
 
   cliente      Cliente       @relation(fields: [clienteId], references: [id])
-  chip         Chip          @relation(fields: [chipId], references: [id])
+  chip         Chip?         @relation(fields: [chipId], references: [id], onDelete: SetNull)
   comprovantes Comprovante[]
 
   @@index([status, criadoEm])
+  @@index([contaId, criadoEm])
   @@map("vendas")
 }
 
@@ -184,7 +187,8 @@ model Comprovante {
   id                Int      @id @default(autoincrement())
   vendaId           Int?     @map("venda_id")
   clienteId         Int      @map("cliente_id")
-  chipId            Int      @map("chip_id")
+  contaId           Int?     @map("conta_id")
+  chipId            Int?     @map("chip_id")
   imagemPath        String   @map("imagem_path")
   nomePagador       String?  @map("nome_pagador")
   valorExtraido     Float?   @map("valor_extraido")
@@ -197,7 +201,7 @@ model Comprovante {
 
   venda   Venda?  @relation(fields: [vendaId], references: [id])
   cliente Cliente @relation(fields: [clienteId], references: [id])
-  chip    Chip    @relation(fields: [chipId], references: [id])
+  chip    Chip?   @relation(fields: [chipId], references: [id], onDelete: SetNull)
 
   @@map("comprovantes")
 }

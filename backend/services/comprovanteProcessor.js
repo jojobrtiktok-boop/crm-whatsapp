@@ -111,7 +111,11 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       if (vendaPendente) {
         await prisma.venda.update({
           where: { id: vendaPendente.id },
-          data: { status: 'confirmado' },
+          data: {
+            status: 'confirmado',
+            contaId: contaId || vendaPendente.contaId || 1,
+            chipNome: chip?.nome || vendaPendente.chipNome || null,
+          },
         });
       } else if (dados.valor) {
         // Criar venda automaticamente se não existe pendente
@@ -119,6 +123,8 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
           data: {
             clienteId,
             chipId,
+            contaId: contaId || 1,
+            chipNome: chip?.nome || null,
             valor: dados.valor,
             status: 'confirmado',
             descricao: `Pagamento confirmado via comprovante - ${dados.banco || 'N/A'}`,

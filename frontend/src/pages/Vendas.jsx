@@ -166,7 +166,7 @@ export default function Vendas() {
               <tr key={venda.id} className="border-b hover:bg-gray-50">
                 <td className="px-4 py-3 text-gray-500">#{venda.id}</td>
                 <td className="px-4 py-3 font-medium">{venda.cliente?.nome || 'Sem nome'}</td>
-                <td className="px-4 py-3 text-gray-600">{venda.chip?.nome}</td>
+                <td className="px-4 py-3 text-gray-600">{venda.chip?.nome || venda.chipNome || '—'}</td>
                 <td className="px-4 py-3 font-semibold text-green-600">{formatarMoeda(venda.valor)}</td>
                 <td className="px-4 py-3">
                   <select
@@ -180,8 +180,9 @@ export default function Vendas() {
                     <option value="reembolsado">Reembolsado</option>
                   </select>
                 </td>
-                <td className="px-4 py-3 text-gray-500">
-                  {new Date(venda.criadoEm).toLocaleDateString('pt-BR')}
+                <td className="px-4 py-3 text-gray-500 text-xs">
+                  <div>{new Date(venda.criadoEm).toLocaleDateString('pt-BR')}</div>
+                  <div style={{ color: '#475569' }}>{new Date(venda.criadoEm).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</div>
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">

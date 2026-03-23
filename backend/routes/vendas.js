@@ -13,7 +13,7 @@ router.get('/', async (req, res, next) => {
     const { status, chipId, dataInicio, dataFim, valorMin, valorMax, pagina = 1, limite = 50 } = req.query;
     const skip = (parseInt(pagina) - 1) * parseInt(limite);
 
-    const where = { chip: { contaId: req.usuario.contaId } };
+    const where = { contaId: req.usuario.contaId };
     if (status) where.status = status;
     if (chipId) where.chipId = parseInt(chipId);
     if (dataInicio || dataFim) {
@@ -58,7 +58,7 @@ router.get('/exportar', async (req, res, next) => {
   try {
     const { status, chipId, dataInicio, dataFim } = req.query;
 
-    const where = { chip: { contaId: req.usuario.contaId } };
+    const where = { contaId: req.usuario.contaId };
     if (status) where.status = status;
     if (chipId) where.chipId = parseInt(chipId);
     if (dataInicio || dataFim) {
@@ -179,7 +179,7 @@ router.put('/:id', async (req, res, next) => {
 router.delete('/todas', async (req, res, next) => {
   try {
     const contaId = req.usuario.contaId;
-    const vendaIds = (await prisma.venda.findMany({ where: { chip: { contaId } }, select: { id: true } })).map((v) => v.id);
+    const vendaIds = (await prisma.venda.findMany({ where: { contaId }, select: { id: true } })).map((v) => v.id);
     if (vendaIds.length === 0) return res.json({ mensagem: 'Nenhuma venda para excluir' });
 
     await prisma.$transaction([
@@ -197,7 +197,7 @@ router.delete('/todas', async (req, res, next) => {
 router.delete('/:id', async (req, res, next) => {
   try {
     const vendaId = parseInt(req.params.id);
-    const existe = await prisma.venda.findFirst({ where: { id: vendaId, chip: { contaId: req.usuario.contaId } } });
+    const existe = await prisma.venda.findFirst({ where: { id: vendaId, contaId: req.usuario.contaId } });
     if (!existe) return res.status(404).json({ erro: 'Venda não encontrada' });
 
     await prisma.$transaction([

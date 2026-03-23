@@ -261,11 +261,15 @@ router.delete('/:id', async (req, res, next) => {
     // Remover execuções de funil vinculadas
     await prisma.funilExecucao.deleteMany({ where: { chipId } });
 
-    // Remover comprovantes vinculados
-    await prisma.comprovante.deleteMany({ where: { chipId } });
-
-    // Remover vendas vinculadas
-    await prisma.venda.deleteMany({ where: { chipId } });
+    // Preservar vendas e comprovantes - apenas desvincula o chip (mantém histórico de métricas)
+    await prisma.venda.updateMany({
+      where: { chipId },
+      data: { chipId: null },
+    });
+    await prisma.comprovante.updateMany({
+      where: { chipId },
+      data: { chipId: null },
+    });
 
     // Remover conversas vinculadas
     await prisma.conversa.deleteMany({ where: { chipId } });

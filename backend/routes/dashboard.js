@@ -11,15 +11,18 @@ router.use(autenticar);
 router.get('/resumo', async (req, res, next) => {
   try {
     const { chipId } = req.query;
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    // Início do dia no horário de Brasília (UTC-3) = 03:00 UTC
+    const agora = new Date();
+    const brazilOffset = 3 * 60 * 60 * 1000; // UTC-3 em ms
+    const hojeStr = new Date(agora.getTime() - brazilOffset).toISOString().split('T')[0];
+    const hoje = new Date(hojeStr + 'T03:00:00.000Z'); // 00:00 Brasília = 03:00 UTC
 
     const inicioSemana = new Date(hoje);
     inicioSemana.setDate(hoje.getDate() - hoje.getDay());
 
-    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const inicioMes = new Date(hojeStr.substring(0, 7) + '-01T03:00:00.000Z'); // 1st of month at 00:00 Brasília
 
-    const whereBase = { chip: { contaId: req.usuario.contaId } };
+    const whereBase = { contaId: req.usuario.contaId };
     if (chipId) whereBase.chipId = parseInt(chipId);
 
     const clienteWhereBase = { chipOrigem: { contaId: req.usuario.contaId } };
@@ -61,7 +64,7 @@ router.get('/resumo', async (req, res, next) => {
     const [totalClientes, totalVendas] = await Promise.all([
       prisma.cliente.count({ where: { chipOrigem: { contaId: req.usuario.contaId } } }),
       prisma.venda.aggregate({
-        where: { status: 'confirmado', chip: { contaId: req.usuario.contaId } },
+        where: { status: 'confirmado', contaId: req.usuario.contaId },
         _sum: { valor: true },
         _count: true,
       }),
@@ -103,8 +106,11 @@ router.get('/resumo', async (req, res, next) => {
 router.get('/comparativo-chips', async (req, res, next) => {
   try {
     const { periodo = 'mes' } = req.query;
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    // Início do dia no horário de Brasília (UTC-3) = 03:00 UTC
+    const agora = new Date();
+    const brazilOffset = 3 * 60 * 60 * 1000; // UTC-3 em ms
+    const hojeStr = new Date(agora.getTime() - brazilOffset).toISOString().split('T')[0];
+    const hoje = new Date(hojeStr + 'T03:00:00.000Z'); // 00:00 Brasília = 03:00 UTC
 
     let dataInicio;
     if (periodo === 'dia') {
@@ -113,7 +119,7 @@ router.get('/comparativo-chips', async (req, res, next) => {
       dataInicio = new Date(hoje);
       dataInicio.setDate(hoje.getDate() - hoje.getDay());
     } else {
-      dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+      dataInicio = new Date(hojeStr.substring(0, 7) + '-01T03:00:00.000Z'); // 1st of month at 00:00 Brasília
     }
 
     const chips = await prisma.chip.findMany({
@@ -156,8 +162,11 @@ router.get('/comparativo-chips', async (req, res, next) => {
 // GET /api/dashboard/chips-resumo - Resumo por chip (dia e semana)
 router.get('/chips-resumo', async (req, res, next) => {
   try {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
+    // Início do dia no horário de Brasília (UTC-3) = 03:00 UTC
+    const agora = new Date();
+    const brazilOffset = 3 * 60 * 60 * 1000; // UTC-3 em ms
+    const hojeStr = new Date(agora.getTime() - brazilOffset).toISOString().split('T')[0];
+    const hoje = new Date(hojeStr + 'T03:00:00.000Z'); // 00:00 Brasília = 03:00 UTC
     const inicioSemana = new Date(hoje);
     inicioSemana.setDate(hoje.getDate() - 6); // últimos 7 dias
 
@@ -202,7 +211,7 @@ router.get('/chips-resumo', async (req, res, next) => {
 router.get('/vendas-recentes', async (req, res, next) => {
   try {
     const vendas = await prisma.venda.findMany({
-      where: { chip: { contaId: req.usuario.contaId } },
+      where: { contaId: req.usuario.contaId },
       take: 20,
       orderBy: { criadoEm: 'desc' },
       include: {

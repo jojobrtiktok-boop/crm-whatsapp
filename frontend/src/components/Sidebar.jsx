@@ -29,8 +29,8 @@ export default function Sidebar() {
       style={{ background: 'linear-gradient(180deg, #080f1f 0%, #060b18 100%)', borderRight: '1px solid #1a2d4a' }}>
 
       {/* Logo */}
-      <div className="flex items-center justify-center py-4" style={{ borderBottom: '1px solid #1a2d4a' }}>
-        <img src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png" alt="Logo" className="h-12 w-auto object-contain" />
+      <div className="flex items-center px-4 py-3" style={{ borderBottom: '1px solid #1a2d4a' }}>
+        <img src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png" alt="Logo" className="h-16 w-auto object-contain" />
       </div>
 
       {/* Menu */}
