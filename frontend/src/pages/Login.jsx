@@ -42,33 +42,18 @@ export default function Login() {
           backdropFilter: 'blur(20px)',
           borderRadius: 24,
           padding: '40px 36px',
-          border: '1px solid rgba(139,92,246,0.25)',
-          boxShadow: '0 0 60px rgba(139,92,246,0.15), 0 0 0 1px rgba(139,92,246,0.1)',
+          border: '1px solid rgba(139,92,246,0.6)',
+          boxShadow: '0 0 40px rgba(139,92,246,0.35), 0 0 80px rgba(139,92,246,0.15), inset 0 0 30px rgba(139,92,246,0.05)',
         }}>
 
           {/* Logo */}
           <div className="flex flex-col items-center mb-8">
-            {/* Contorno roxo brilhoso */}
-            <div style={{
-              padding: 6,
-              borderRadius: 28,
-              background: 'linear-gradient(135deg, rgba(139,92,246,0.8), rgba(99,102,241,0.8))',
-              boxShadow: '0 0 30px rgba(139,92,246,0.6), 0 0 60px rgba(139,92,246,0.3)',
-              marginBottom: 20,
-            }}>
-              <div style={{
-                background: '#070d1f',
-                borderRadius: 22,
-                padding: '10px 16px',
-              }}>
-                <img
-                  src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
-                  alt="Logo"
-                  style={{ height: 90, objectFit: 'contain', display: 'block', filter: 'brightness(1.1)' }}
-                />
-              </div>
-            </div>
-            <p style={{ color: '#94a3b8', fontSize: 14, margin: 0 }}>Entre na sua conta</p>
+            <img
+              src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
+              alt="Logo"
+              style={{ height: 110, objectFit: 'contain', display: 'block', filter: 'brightness(1.2) drop-shadow(0 0 10px rgba(129,140,248,0.5))' }}
+            />
+            <p style={{ color: '#94a3b8', fontSize: 14, margin: '10px 0 0 0' }}>Entre na sua conta</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
