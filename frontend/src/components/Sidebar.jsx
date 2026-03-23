@@ -25,7 +25,7 @@ export default function Sidebar() {
   const { logout, usuario } = useAuth();
 
   return (
-    <aside className="fixed left-0 top-0 h-full w-64 bg-gray-900 text-white flex flex-col z-30">
+    <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gray-900 text-white flex-col z-30">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-700">
         <h1 className="text-xl font-bold text-primary-400">CRM WhatsApp</h1>
