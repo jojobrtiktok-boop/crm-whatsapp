@@ -18,20 +18,39 @@ export default function Configuracoes() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-bold text-gray-800">Configuracoes</h1>
+      <h1 className="text-2xl font-bold text-gray-800">Configurações</h1>
 
-      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto pb-0 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
+      {/* Mobile: grid 2x3 de botões */}
+      <div className="grid grid-cols-3 gap-2 md:hidden">
         {abas.map((aba) => (
           <button
             key={aba.key}
             onClick={() => setAbaAtiva(aba.key)}
-            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
+            className={`flex flex-col items-center justify-center gap-1 py-3 rounded-xl text-xs font-medium transition-all border ${
+              abaAtiva === aba.key
+                ? 'bg-primary-600 text-white border-primary-600'
+                : 'bg-white text-gray-600 border-gray-200'
+            }`}
+          >
+            <aba.icon size={18} />
+            <span className="leading-tight text-center">{aba.label}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* Desktop: abas horizontais */}
+      <div className="hidden md:flex gap-1 border-b border-gray-200">
+        {abas.map((aba) => (
+          <button
+            key={aba.key}
+            onClick={() => setAbaAtiva(aba.key)}
+            className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               abaAtiva === aba.key
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <aba.icon size={14} />
+            <aba.icon size={15} />
             {aba.label}
           </button>
         ))}
