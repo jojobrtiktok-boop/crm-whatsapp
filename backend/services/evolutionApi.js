@@ -196,7 +196,26 @@ async function criarInstancia(nomeSessao) {
 
 // Gerar QR Code
 async function gerarQRCode(sessao) {
+  // Limpar token em cache para forçar token fresco
+  delete tokenCache[sessao];
+
+  // Fechar sessão existente para garantir estado limpo (QR novo)
+  try {
+    const token = await getToken(sessao);
+    const closeApi = axios.create({
+      baseURL: BASE_URL,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      timeout: 10000,
+    });
+    await closeApi.post(`/api/${sessao}/close-session`).catch(() => {});
+    // aguardar WPPConnect processar o fechamento
+    await new Promise((r) => setTimeout(r, 1500));
+  } catch {}
+
+  // Limpar token novamente após fechar e iniciar sessão fresca
+  delete tokenCache[sessao];
   await criarInstancia(sessao).catch(() => {});
+
   const api = await apiFor(sessao);
   const response = await api.get(`/api/${sessao}/qrcode-session`);
   const base64 = response.data?.base64 || response.data?.qrcode || null;

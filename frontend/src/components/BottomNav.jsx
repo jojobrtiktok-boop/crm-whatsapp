@@ -35,11 +35,11 @@ export default function BottomNav() {
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
               padding: '6px 10px', borderRadius: 14,
               ...(isActive ? {
-                color: '#a78bfa',
-                background: 'rgba(129,140,248,0.12)',
-                border: '1px solid rgba(129,140,248,0.45)',
-                boxShadow: '0 0 16px rgba(129,140,248,0.4), inset 0 0 8px rgba(129,140,248,0.08)',
-                filter: 'drop-shadow(0 0 6px rgba(167,139,250,0.8))',
+                color: '#c4b5fd',
+                background: 'rgba(129,140,248,0.15)',
+                border: '1px solid rgba(129,140,248,0.6)',
+                boxShadow: '0 0 20px rgba(129,140,248,0.5), 0 0 40px rgba(129,140,248,0.15), inset 0 0 10px rgba(129,140,248,0.1)',
+                filter: 'drop-shadow(0 0 8px rgba(167,139,250,0.9))',
               } : {
                 color: '#3d5270',
                 border: '1px solid transparent',

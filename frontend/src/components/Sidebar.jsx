@@ -107,11 +107,13 @@ export default function Sidebar() {
               color: isActive ? '#ffffff' : '#8899aa',
               textDecoration: 'none',
               transition: 'all 0.2s',
-              border: isActive ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+              border: isActive ? '1px solid rgba(129,140,248,0.55)' : '1px solid transparent',
               background: isActive
-                ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(139,92,246,0.18))'
+                ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(139,92,246,0.22))'
                 : 'transparent',
-              boxShadow: isActive ? '0 0 14px rgba(99,102,241,0.18)' : 'none',
+              boxShadow: isActive
+                ? '0 0 18px rgba(129,140,248,0.4), 0 0 40px rgba(129,140,248,0.12), inset 0 0 12px rgba(129,140,248,0.06)'
+                : 'none',
             })}
             onMouseEnter={e => { if (!e.currentTarget.style.boxShadow.includes('14px')) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#ccd6e0'; } }}
             onMouseLeave={e => { if (!e.currentTarget.style.boxShadow.includes('14px')) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8899aa'; } }}
