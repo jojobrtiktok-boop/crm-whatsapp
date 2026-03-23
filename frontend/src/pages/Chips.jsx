@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, Check, X, Loader2, Hash, Pencil } from 'lucide-react';
+import { Plus, Smartphone, Wifi, WifiOff, BarChart3, Trash2, QrCode, RefreshCw, Check, X, Loader2, Hash, Pencil, AlertTriangle, ShieldCheck } from 'lucide-react';
 import api from '../api';
 import { useSocketEvent } from '../hooks/useSocket';
 import { useAuth } from '../hooks/useAuth';
@@ -12,6 +12,7 @@ export default function Chips() {
   const [criando, setCriando] = useState(false);
   const [nomeNovo, setNomeNovo] = useState('');
   const [salvandoNovo, setSalvandoNovo] = useState(false);
+  const [proxyStatus, setProxyStatus] = useState(null); // null | 'ok' | 'fail' | 'none'
 
   // Estado do modal de conexão
   const [modalConexao, setModalConexao] = useState(null); // { chipId, chipNome }
@@ -32,7 +33,18 @@ export default function Chips() {
     }
   }
 
-  useEffect(() => { carregarDados(); }, []);
+  async function verificarProxy() {
+    try {
+      const cfg = await api.get('/configuracoes');
+      if (!cfg.data.proxy_url) { setProxyStatus('none'); return; }
+      const res = await api.get('/configuracoes/proxy/test');
+      setProxyStatus(res.data.ok ? 'ok' : 'fail');
+    } catch {
+      setProxyStatus('fail');
+    }
+  }
+
+  useEffect(() => { carregarDados(); verificarProxy(); }, []);
   useEffect(() => () => { if (intervalRef.current) clearInterval(intervalRef.current); }, []);
 
   const handleChipStatus = useCallback(() => { carregarDados(); }, []);
@@ -193,6 +205,20 @@ export default function Chips() {
           <Plus size={16} /> Novo Chip
         </button>
       </div>
+
+      {/* Status do proxy */}
+      {proxyStatus === 'fail' && (
+        <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl px-4 py-3 text-sm">
+          <AlertTriangle size={16} className="shrink-0 text-yellow-500" />
+          <span><strong>Proxy offline</strong> — os chips podem sofrer restrições do WhatsApp. Verifique em Configurações → Proxy.</span>
+        </div>
+      )}
+      {proxyStatus === 'ok' && (
+        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
+          <ShieldCheck size={16} className="shrink-0 text-green-500" />
+          <span>Proxy ativo — chips protegidos.</span>
+        </div>
+      )}
 
       {/* Form inline de criacao */}
       {criando && (
