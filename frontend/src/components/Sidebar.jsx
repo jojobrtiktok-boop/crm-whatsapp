@@ -8,7 +8,6 @@ import {
   MessageCircle,
   Settings,
   LogOut,
-  Zap,
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -30,16 +29,8 @@ export default function Sidebar() {
       style={{ background: 'linear-gradient(180deg, #080f1f 0%, #060b18 100%)', borderRight: '1px solid #1a2d4a' }}>
 
       {/* Logo */}
-      <div className="px-6 py-5" style={{ borderBottom: '1px solid #1a2d4a' }}>
-        <div className="flex items-center gap-2.5">
-          <div className="p-1.5 rounded-lg" style={{ background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)', boxShadow: '0 0 14px rgba(99,102,241,0.5)' }}>
-            <Zap size={16} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-sm font-bold text-white tracking-wide">CRM WhatsApp</h1>
-            <p className="text-[10px]" style={{ color: '#475569' }}>Automação + IA</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-center py-4" style={{ borderBottom: '1px solid #1a2d4a' }}>
+        <img src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png" alt="Logo" className="h-12 w-auto object-contain" />
       </div>
 
       {/* Menu */}
