@@ -40,11 +40,11 @@ html, body, #root {
 
 /* ── Borders ──────────────────────────────────────────────── */
 .border-gray-100,
-.border-gray-200    { border-color: rgba(129,140,248,0.18) !important; }
-.border-gray-300    { border-color: rgba(129,140,248,0.22) !important; }
-.border-b           { border-bottom-color: rgba(129,140,248,0.15) !important; }
-.border-t           { border-top-color: rgba(129,140,248,0.15) !important; }
-.divide-y > * + *   { border-top-color: rgba(129,140,248,0.15) !important; }
+.border-gray-200    { border-color: rgba(139,92,246,0.35) !important; }
+.border-gray-300    { border-color: rgba(139,92,246,0.4) !important; }
+.border-b           { border-bottom-color: rgba(139,92,246,0.2) !important; }
+.border-t           { border-top-color: rgba(139,92,246,0.2) !important; }
+.divide-y > * + *   { border-top-color: rgba(139,92,246,0.2) !important; }
 
 /* ── Typography ───────────────────────────────────────────── */
 .text-gray-900,
@@ -128,9 +128,9 @@ option { background: #0d1526; color: #f1f5f9; }
 
 /* ── Glow Card ────────────────────────────────────────────── */
 .card-glow {
-  border: 1px solid rgba(129,140,248,0.25);
+  border: 1px solid rgba(139,92,246,0.45);
   background: var(--bg-card);
-  box-shadow: 0 0 20px rgba(129,140,248,0.08), 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03);
+  box-shadow: 0 0 24px rgba(139,92,246,0.25), 0 0 50px rgba(139,92,246,0.1), inset 0 0 20px rgba(139,92,246,0.04);
   border-radius: 14px;
 }
 
@@ -142,11 +142,12 @@ option { background: #0d1526; color: #f1f5f9; }
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 .rounded-xl.border {
-  box-shadow: 0 0 16px rgba(129,140,248,0.08);
+  border-color: rgba(139,92,246,0.4) !important;
+  box-shadow: 0 0 18px rgba(139,92,246,0.2), 0 0 40px rgba(139,92,246,0.08), inset 0 0 20px rgba(139,92,246,0.03);
 }
 .rounded-xl.border:hover {
-  box-shadow: 0 0 24px rgba(129,140,248,0.18), 0 4px 20px rgba(0,0,0,0.3);
-  border-color: rgba(129,140,248,0.35) !important;
+  border-color: rgba(139,92,246,0.65) !important;
+  box-shadow: 0 0 28px rgba(139,92,246,0.35), 0 0 60px rgba(139,92,246,0.15), inset 0 0 24px rgba(139,92,246,0.05);
 }
 
 /* ── Table/List alternates ────────────────────────────────── */
