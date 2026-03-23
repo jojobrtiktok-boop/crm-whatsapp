@@ -32,7 +32,7 @@ export default function Header() {
         <img
           src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
           alt="Logo"
-          style={{ height: '70px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(129,140,248,0.5))' }}
+          style={{ height: '82px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(129,140,248,0.5))' }}
         />
       </div>
       <div className="flex-1" />
