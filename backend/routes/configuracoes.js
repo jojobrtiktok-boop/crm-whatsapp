@@ -2,6 +2,7 @@
 const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const { autenticar, apenasAdmin } = require('../middleware/auth');
+const axios = require('axios');
 
 const prisma = new PrismaClient();
 
@@ -38,6 +39,34 @@ router.put('/', async (req, res, next) => {
     res.json({ mensagem: 'Configurações atualizadas' });
   } catch (err) {
     next(err);
+  }
+});
+
+// GET /api/configuracoes/proxy/test - Testa o proxy configurado
+router.get('/proxy/test', async (req, res) => {
+  try {
+    const config = await prisma.configuracao.findFirst({
+      where: { chave: 'proxy_url', contaId: req.usuario.contaId },
+    });
+    if (!config?.valor) return res.json({ ok: false, erro: 'Nenhum proxy configurado' });
+
+    const proxyUrl = new URL(config.valor);
+    const proxyConfig = {
+      protocol: proxyUrl.protocol,
+      host: proxyUrl.hostname,
+      port: parseInt(proxyUrl.port) || 80,
+    };
+    if (proxyUrl.username) {
+      proxyConfig.auth = {
+        username: decodeURIComponent(proxyUrl.username),
+        password: decodeURIComponent(proxyUrl.password),
+      };
+    }
+
+    const resp = await axios.get('https://ipinfo.io/json', { proxy: proxyConfig, timeout: 10000 });
+    res.json({ ok: true, ...resp.data });
+  } catch (err) {
+    res.json({ ok: false, erro: err.message });
   }
 });
 

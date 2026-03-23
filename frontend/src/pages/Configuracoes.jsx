@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -10,6 +10,7 @@ export default function Configuracoes() {
   const abas = [
     { key: 'funis', label: 'Funis Ativos', icon: GitBranch },
     { key: 'pagamento', label: 'Pagamento', icon: CreditCard },
+    { key: 'proxy', label: 'Proxy', icon: Globe },
     { key: 'usuarios', label: 'Usuarios', icon: Shield },
     { key: 'blacklist', label: 'Blacklist', icon: Ban },
   ];
@@ -37,6 +38,7 @@ export default function Configuracoes() {
 
       {abaAtiva === 'funis' && <ConfigFunis />}
       {abaAtiva === 'pagamento' && <ConfigPagamento />}
+      {abaAtiva === 'proxy' && <ConfigProxy />}
       {abaAtiva === 'usuarios' && <ConfigUsuarios />}
       {abaAtiva === 'blacklist' && <ConfigBlacklist />}
     </div>
@@ -419,6 +421,102 @@ function ConfigPagamento() {
       >
         <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Configuracoes'}
       </button>
+    </div>
+  );
+}
+
+function ConfigProxy() {
+  const [proxyUrl, setProxyUrl] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [testando, setTestando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  useEffect(() => {
+    api.get('/configuracoes').then((res) => {
+      setProxyUrl(res.data.proxy_url || '');
+    }).catch(console.error);
+  }, []);
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      await api.put('/configuracoes', { proxy_url: proxyUrl });
+      alert('Proxy salvo!');
+    } catch {
+      alert('Erro ao salvar');
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function testar() {
+    setTestando(true);
+    setResultado(null);
+    try {
+      const res = await api.get('/configuracoes/proxy/test');
+      setResultado(res.data);
+    } catch {
+      setResultado({ ok: false, erro: 'Erro ao conectar com o servidor' });
+    } finally {
+      setTestando(false);
+    }
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl space-y-5">
+      <div>
+        <h3 className="font-semibold text-gray-800 mb-1">Proxy para Chips WhatsApp</h3>
+        <p className="text-xs text-gray-500">
+          Use um proxy residencial ou 4G para evitar restrições do WhatsApp. Formato: <code className="bg-gray-100 px-1 rounded">http://usuario:senha@host:porta</code>
+        </p>
+      </div>
+
+      <div>
+        <label className="block text-xs text-gray-600 mb-1">URL do Proxy</label>
+        <input
+          type="text"
+          value={proxyUrl}
+          onChange={(e) => setProxyUrl(e.target.value)}
+          className="w-full rounded-lg border-gray-300 text-sm font-mono"
+          placeholder="http://user:pass@proxy.astron.com:10000"
+        />
+      </div>
+
+      <div className="flex gap-2">
+        <button
+          onClick={salvar}
+          disabled={salvando}
+          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+        >
+          <Save size={14} /> {salvando ? 'Salvando...' : 'Salvar'}
+        </button>
+        <button
+          onClick={testar}
+          disabled={testando}
+          className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200 disabled:opacity-50"
+        >
+          <Globe size={14} /> {testando ? 'Testando...' : 'Testar Proxy'}
+        </button>
+      </div>
+
+      {resultado && (
+        <div className={`rounded-lg p-4 ${resultado.ok ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'}`}>
+          {resultado.ok ? (
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-green-700 font-medium text-sm">
+                <Wifi size={16} /> Proxy funcionando
+              </div>
+              <p className="text-sm text-gray-700">IP: <strong>{resultado.ip}</strong></p>
+              <p className="text-sm text-gray-700">País: <strong>{resultado.country} — {resultado.city}</strong></p>
+              {resultado.org && <p className="text-sm text-gray-700">Operadora: <strong>{resultado.org}</strong></p>}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-red-700 text-sm">
+              <WifiOff size={16} /> Falhou: {resultado.erro}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
