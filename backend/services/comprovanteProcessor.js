@@ -194,15 +194,29 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       if (cfgMap.upsell_ativo === 'true' && cfgMap.upsell_blocos) {
         try {
           const blocos = JSON.parse(cfgMap.upsell_blocos);
-          const tempoMs = parseInt(cfgMap.upsell_tempo || '30') * (cfgMap.upsell_unidade === 'horas' ? 3600000 : 60000);
+          const unidadeMs = cfgMap.upsell_unidade === 'horas' ? 3600000 : 60000;
+          const tempoMs = parseInt(cfgMap.upsell_tempo || '30') * unidadeMs;
           const { mensagemQueue } = require('../queues/setup');
+          let acumulado = tempoMs;
           for (let i = 0; i < blocos.length; i++) {
             const bloco = blocos[i];
-            const delay = tempoMs + (i * 3000);
+            if (bloco.tipo === 'delay') {
+              // Bloco delay: acumula tempo extra para os próximos blocos
+              const mult = bloco.unidade === 'horas' ? 3600000 : bloco.unidade === 'segundos' ? 1000 : 60000;
+              acumulado += parseInt(bloco.valor || '1') * mult;
+              continue;
+            }
+            const delay = acumulado + (i * 3000);
             if (bloco.tipo === 'texto' && bloco.valor) {
               await mensagemQueue.add({ tipo: 'texto', instancia: instanciaEvolution, telefone: telefoneCliente, mensagem: bloco.valor }, { delay });
             } else if (bloco.tipo === 'video' && bloco.valor) {
               await mensagemQueue.add({ tipo: 'video', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
+            } else if (bloco.tipo === 'imagem' && bloco.valor) {
+              await mensagemQueue.add({ tipo: 'imagem', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
+            } else if (bloco.tipo === 'audio' && bloco.valor) {
+              await mensagemQueue.add({ tipo: 'audio', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor }, { delay });
+            } else if (bloco.tipo === 'pdf' && bloco.valor) {
+              await mensagemQueue.add({ tipo: 'documento', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, nomeArquivo: 'upsell.pdf' }, { delay });
             }
           }
           console.log(`[Comprovante] Upsell agendado: ${blocos.length} blocos em ${cfgMap.upsell_tempo} ${cfgMap.upsell_unidade}`);

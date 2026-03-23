@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp, Film, Type, FileText } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp, Film, Type, FileText, Image, Mic, Zap, GripVertical } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -9,6 +9,7 @@ export default function Configuracoes() {
 
   const abas = [
     { key: 'funis', label: 'Funis Ativos', icon: GitBranch },
+    { key: 'upsell', label: 'Upsell', icon: Zap },
     { key: 'pagamento', label: 'Pagamento', icon: CreditCard },
     { key: 'proxy', label: 'Proxy', icon: Globe },
     { key: 'usuarios', label: 'Usuarios', icon: Shield },
@@ -37,6 +38,7 @@ export default function Configuracoes() {
       </div>
 
       {abaAtiva === 'funis' && <ConfigFunis />}
+      {abaAtiva === 'upsell' && <ConfigUpsell />}
       {abaAtiva === 'pagamento' && <ConfigPagamento />}
       {abaAtiva === 'proxy' && <ConfigProxy />}
       {abaAtiva === 'usuarios' && <ConfigUsuarios />}
@@ -263,7 +265,6 @@ function ConfigPagamento() {
   const [etiquetas, setEtiquetas] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [carregandoEtiquetas, setCarregandoEtiquetas] = useState(false);
-  const [upsellBlocos, setUpsellBlocos] = useState([]);
 
   useEffect(() => {
     Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
@@ -276,13 +277,7 @@ function ConfigPagamento() {
         etiqueta_pagamento_id: cfg.etiqueta_pagamento_id || '',
         confirmacao_pdf_ativo: cfg.confirmacao_pdf_ativo === 'true',
         confirmacao_pdf_url: cfg.confirmacao_pdf_url || '',
-        upsell_ativo: cfg.upsell_ativo === 'true',
-        upsell_tempo: cfg.upsell_tempo || '30',
-        upsell_unidade: cfg.upsell_unidade || 'minutos',
       });
-      if (cfg.upsell_blocos) {
-        try { setUpsellBlocos(JSON.parse(cfg.upsell_blocos)); } catch { setUpsellBlocos([]); }
-      }
       if (chipsConectados.length > 0) {
         buscarEtiquetas(chipsConectados[0].id);
       }
@@ -310,10 +305,6 @@ function ConfigPagamento() {
         etiqueta_pagamento_id: configs.etiqueta_pagamento_id,
         confirmacao_pdf_ativo: configs.confirmacao_pdf_ativo ? 'true' : 'false',
         confirmacao_pdf_url: configs.confirmacao_pdf_url,
-        upsell_ativo: configs.upsell_ativo ? 'true' : 'false',
-        upsell_tempo: configs.upsell_tempo,
-        upsell_unidade: configs.upsell_unidade,
-        upsell_blocos: JSON.stringify(upsellBlocos),
       });
       alert('Configurações salvas!');
     } catch {
@@ -321,18 +312,6 @@ function ConfigPagamento() {
     } finally {
       setSalvando(false);
     }
-  }
-
-  function adicionarBloco(tipo) {
-    setUpsellBlocos(prev => [...prev, { tipo, valor: '' }]);
-  }
-
-  function atualizarBloco(idx, valor) {
-    setUpsellBlocos(prev => prev.map((b, i) => i === idx ? { ...b, valor } : b));
-  }
-
-  function removerBloco(idx) {
-    setUpsellBlocos(prev => prev.filter((_, i) => i !== idx));
   }
 
   return (
@@ -428,101 +407,6 @@ function ConfigPagamento() {
         )}
       </div>
 
-      {/* Upsell automático */}
-      <div className="border-t border-gray-100 pt-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="font-semibold text-gray-800">Upsell Automático</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Envia mensagens automaticamente após a confirmação do pagamento.</p>
-          </div>
-          <button
-            onClick={() => setConfigs(prev => ({ ...prev, upsell_ativo: !prev.upsell_ativo }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configs.upsell_ativo ? 'bg-primary-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configs.upsell_ativo ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
-
-        {configs.upsell_ativo && (
-          <div className="space-y-4">
-            {/* Tempo de espera */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <label className="block text-xs text-gray-600 mb-2 flex items-center gap-1"><Clock size={12} /> Enviar após</label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  min="1"
-                  value={configs.upsell_tempo || '30'}
-                  onChange={(e) => setConfigs(prev => ({ ...prev, upsell_tempo: e.target.value }))}
-                  className="w-24 rounded-lg border-gray-300 text-sm"
-                />
-                <select
-                  value={configs.upsell_unidade || 'minutos'}
-                  onChange={(e) => setConfigs(prev => ({ ...prev, upsell_unidade: e.target.value }))}
-                  className="flex-1 rounded-lg border-gray-300 text-sm"
-                >
-                  <option value="minutos">Minutos</option>
-                  <option value="horas">Horas</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Blocos de conteúdo */}
-            {upsellBlocos.length > 0 && (
-              <div className="space-y-3">
-                {upsellBlocos.map((bloco, idx) => (
-                  <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                    <div className="flex items-center gap-2 mb-2">
-                      {bloco.tipo === 'video' ? (
-                        <span className="text-xs font-medium text-purple-600 flex items-center gap-1"><Film size={12} /> Vídeo</span>
-                      ) : (
-                        <span className="text-xs font-medium text-blue-600 flex items-center gap-1"><Type size={12} /> Texto</span>
-                      )}
-                      <button onClick={() => removerBloco(idx)} className="ml-auto text-gray-300 hover:text-red-500">
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                    {bloco.tipo === 'video' ? (
-                      <input
-                        type="text"
-                        value={bloco.valor}
-                        onChange={(e) => atualizarBloco(idx, e.target.value)}
-                        className="w-full rounded-lg border-gray-300 text-sm"
-                        placeholder="https://exemplo.com/video.mp4"
-                      />
-                    ) : (
-                      <textarea
-                        value={bloco.valor}
-                        onChange={(e) => atualizarBloco(idx, e.target.value)}
-                        className="w-full rounded-lg border-gray-300 text-sm"
-                        rows={3}
-                        placeholder="Texto da mensagem de upsell..."
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Botões adicionar bloco */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => adicionarBloco('video')}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-purple-600 border border-dashed border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
-              >
-                <Film size={13} /> + Vídeo
-              </button>
-              <button
-                onClick={() => adicionarBloco('texto')}
-                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
-              >
-                <Type size={13} /> + Texto
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
       <button
         onClick={salvar}
         disabled={salvando}
@@ -530,6 +414,194 @@ function ConfigPagamento() {
       >
         <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Configurações'}
       </button>
+    </div>
+  );
+}
+
+const TIPOS_BLOCO = [
+  { tipo: 'texto',  label: 'Texto',   icon: Type,     cor: 'blue'   },
+  { tipo: 'video',  label: 'Vídeo',   icon: Film,     cor: 'purple' },
+  { tipo: 'imagem', label: 'Imagem',  icon: Image,    cor: 'green'  },
+  { tipo: 'audio',  label: 'Áudio',   icon: Mic,      cor: 'orange' },
+  { tipo: 'pdf',    label: 'PDF',     icon: FileText, cor: 'red'    },
+  { tipo: 'delay',  label: 'Delay',   icon: Clock,    cor: 'gray'   },
+];
+
+const COR_MAP = {
+  blue:   { text: '#3b82f6', border: 'rgba(59,130,246,0.3)',  bg: 'rgba(59,130,246,0.07)'  },
+  purple: { text: '#8b5cf6', border: 'rgba(139,92,246,0.3)', bg: 'rgba(139,92,246,0.07)' },
+  green:  { text: '#10b981', border: 'rgba(16,185,129,0.3)', bg: 'rgba(16,185,129,0.07)' },
+  orange: { text: '#f59e0b', border: 'rgba(245,158,11,0.3)', bg: 'rgba(245,158,11,0.07)' },
+  red:    { text: '#ef4444', border: 'rgba(239,68,68,0.3)',   bg: 'rgba(239,68,68,0.07)'  },
+  gray:   { text: '#64748b', border: 'rgba(100,116,139,0.3)', bg: 'rgba(100,116,139,0.07)' },
+};
+
+function BlocoInput({ bloco, idx, onChange, onRemove }) {
+  const def = TIPOS_BLOCO.find(t => t.tipo === bloco.tipo) || TIPOS_BLOCO[0];
+  const cor = COR_MAP[def.cor];
+  const Icon = def.icon;
+
+  return (
+    <div style={{ background: cor.bg, border: `1px solid ${cor.border}`, borderRadius: 12, padding: '12px 14px' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={13} style={{ color: cor.text }} />
+        <span className="text-xs font-semibold" style={{ color: cor.text }}>{def.label}</span>
+        <button onClick={onRemove} className="ml-auto" style={{ color: '#475569' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+          onMouseLeave={e => e.currentTarget.style.color = '#475569'}>
+          <Trash2 size={13} />
+        </button>
+      </div>
+
+      {bloco.tipo === 'texto' && (
+        <textarea value={bloco.valor} onChange={e => onChange(e.target.value)}
+          className="w-full rounded-lg border-gray-300 text-sm" rows={3}
+          placeholder="Texto da mensagem..." />
+      )}
+      {(bloco.tipo === 'video' || bloco.tipo === 'imagem' || bloco.tipo === 'audio') && (
+        <input type="text" value={bloco.valor} onChange={e => onChange(e.target.value)}
+          className="w-full rounded-lg border-gray-300 text-sm"
+          placeholder={bloco.tipo === 'video' ? 'https://exemplo.com/video.mp4' : bloco.tipo === 'imagem' ? 'https://exemplo.com/imagem.jpg' : 'https://exemplo.com/audio.ogg'} />
+      )}
+      {bloco.tipo === 'pdf' && (
+        <input type="text" value={bloco.valor} onChange={e => onChange(e.target.value)}
+          className="w-full rounded-lg border-gray-300 text-sm"
+          placeholder="https://exemplo.com/documento.pdf" />
+      )}
+      {bloco.tipo === 'delay' && (
+        <div className="flex gap-2">
+          <input type="number" min="1" value={bloco.valor || '1'}
+            onChange={e => onChange(e.target.value)}
+            className="w-20 rounded-lg border-gray-300 text-sm" />
+          <select value={bloco.unidade || 'minutos'}
+            onChange={e => onChange(bloco.valor || '1', e.target.value)}
+            className="flex-1 rounded-lg border-gray-300 text-sm">
+            <option value="segundos">Segundos</option>
+            <option value="minutos">Minutos</option>
+            <option value="horas">Horas</option>
+          </select>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ConfigUpsell() {
+  const [ativo, setAtivo] = useState(false);
+  const [tempo, setTempo] = useState('30');
+  const [unidade, setUnidade] = useState('minutos');
+  const [blocos, setBlocos] = useState([]);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    api.get('/configuracoes').then(res => {
+      const cfg = res.data;
+      setAtivo(cfg.upsell_ativo === 'true');
+      setTempo(cfg.upsell_tempo || '30');
+      setUnidade(cfg.upsell_unidade || 'minutos');
+      if (cfg.upsell_blocos) {
+        try { setBlocos(JSON.parse(cfg.upsell_blocos)); } catch { setBlocos([]); }
+      }
+    }).catch(console.error);
+  }, []);
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      await api.put('/configuracoes', {
+        upsell_ativo: ativo ? 'true' : 'false',
+        upsell_tempo: tempo,
+        upsell_unidade: unidade,
+        upsell_blocos: JSON.stringify(blocos),
+      });
+      alert('Upsell salvo!');
+    } catch { alert('Erro ao salvar'); }
+    finally { setSalvando(false); }
+  }
+
+  function adicionarBloco(tipo) {
+    setBlocos(prev => [...prev, { tipo, valor: '', unidade: 'minutos' }]);
+  }
+
+  function atualizarBloco(idx, valor, novaUnidade) {
+    setBlocos(prev => prev.map((b, i) => i === idx
+      ? { ...b, valor, ...(novaUnidade !== undefined ? { unidade: novaUnidade } : {}) }
+      : b
+    ));
+  }
+
+  return (
+    <div className="max-w-2xl space-y-4">
+      {/* Card principal */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
+        {/* Header toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-gray-800 flex items-center gap-2"><Zap size={16} style={{ color: '#f59e0b' }} /> Upsell Automático</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Sequência de mensagens enviada automaticamente após a confirmação do pagamento.</p>
+          </div>
+          <button onClick={() => setAtivo(v => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${ativo ? 'bg-primary-600' : 'bg-gray-300'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ativo ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {ativo && (
+          <>
+            {/* Delay inicial */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <label className="block text-xs text-gray-600 mb-2 flex items-center gap-1"><Clock size={12} /> Iniciar upsell após</label>
+              <div className="flex gap-2">
+                <input type="number" min="1" value={tempo}
+                  onChange={e => setTempo(e.target.value)}
+                  className="w-24 rounded-lg border-gray-300 text-sm" />
+                <select value={unidade} onChange={e => setUnidade(e.target.value)}
+                  className="flex-1 rounded-lg border-gray-300 text-sm">
+                  <option value="minutos">Minutos</option>
+                  <option value="horas">Horas</option>
+                </select>
+              </div>
+              <p className="text-[10px] text-gray-400 mt-1">Tempo contado a partir do momento que o pagamento é confirmado.</p>
+            </div>
+
+            {/* Blocos */}
+            {blocos.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-gray-500 font-medium">Sequência de envio</p>
+                {blocos.map((bloco, idx) => (
+                  <BlocoInput key={idx} bloco={bloco} idx={idx}
+                    onChange={(v, u) => atualizarBloco(idx, v, u)}
+                    onRemove={() => setBlocos(prev => prev.filter((_, i) => i !== idx))} />
+                ))}
+              </div>
+            )}
+
+            {/* Botões adicionar */}
+            <div>
+              <p className="text-xs text-gray-500 mb-2 font-medium">Adicionar bloco</p>
+              <div className="grid grid-cols-3 gap-2">
+                {TIPOS_BLOCO.map(({ tipo, label, icon: Icon, cor }) => {
+                  const c = COR_MAP[cor];
+                  return (
+                    <button key={tipo} onClick={() => adicionarBloco(tipo)}
+                      style={{ color: c.text, border: `1px dashed ${c.border}`, borderRadius: 10, background: 'transparent' }}
+                      className="flex items-center justify-center gap-1.5 py-2 text-xs transition-all hover:opacity-80"
+                      onMouseEnter={e => e.currentTarget.style.background = c.bg}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <Icon size={13} /> + {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </>
+        )}
+
+        <button onClick={salvar} disabled={salvando}
+          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+          <Save size={15} /> {salvando ? 'Salvando...' : 'Salvar Upsell'}
+        </button>
+      </div>
     </div>
   );
 }
