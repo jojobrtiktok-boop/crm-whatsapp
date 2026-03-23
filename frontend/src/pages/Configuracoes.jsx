@@ -20,18 +20,18 @@ export default function Configuracoes() {
     <div className="space-y-4">
       <h1 className="text-2xl font-bold text-gray-800">Configuracoes</h1>
 
-      <div className="flex gap-2 border-b border-gray-200">
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto pb-0 scrollbar-hide" style={{ WebkitOverflowScrolling: 'touch' }}>
         {abas.map((aba) => (
           <button
             key={aba.key}
             onClick={() => setAbaAtiva(aba.key)}
-            className={`flex items-center gap-2 px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            className={`flex items-center gap-1.5 px-3 py-2 text-xs font-medium border-b-2 transition-colors whitespace-nowrap shrink-0 ${
               abaAtiva === aba.key
                 ? 'border-primary-600 text-primary-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700'
             }`}
           >
-            <aba.icon size={16} />
+            <aba.icon size={14} />
             {aba.label}
           </button>
         ))}

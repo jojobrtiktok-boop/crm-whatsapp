@@ -26,7 +26,16 @@ export default function Header() {
   return (
     <header className="h-14 flex items-center justify-between px-6"
       style={{ background: 'rgba(6,11,24,0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1a2d4a' }}>
-      <div>
+      {/* Mobile: logo */}
+      <div className="md:hidden">
+        <img
+          src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
+          alt="Logo"
+          style={{ height: '36px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 6px rgba(129,140,248,0.4))' }}
+        />
+      </div>
+      {/* Desktop: título */}
+      <div className="hidden md:block">
         <h2 className="text-sm font-semibold text-white tracking-wide">Painel de Controle</h2>
       </div>
 

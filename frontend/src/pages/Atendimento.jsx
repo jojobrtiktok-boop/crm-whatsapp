@@ -66,6 +66,7 @@ export default function Atendimento() {
   const [leads, setLeads] = useState([]);
   const [leadsPagos, setLeadsPagos] = useState([]);
   const [selecionado, setSelecionado] = useState(null);
+  const [vistaChat, setVistaChat] = useState(false); // mobile: alterna entre lista e chat
   const [conversas, setConversas] = useState([]);
   const [mensagem, setMensagem] = useState('');
   const [chips, setChips] = useState([]);
@@ -127,6 +128,7 @@ export default function Atendimento() {
 
   async function selecionarLead(lead) {
     setSelecionado(lead);
+    setVistaChat(true);
     try {
       const res = await api.get(`/clientes/${lead.id}/conversas`);
       setConversas(res.data);
@@ -220,9 +222,9 @@ export default function Atendimento() {
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Lista de leads */}
-      <div className="w-96 border-r border-gray-200 flex flex-col">
+    <div className="h-[calc(100vh-7rem)] md:h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Lista de leads — mobile: oculta quando vistaChat está ativo */}
+      <div className={`${vistaChat ? 'hidden' : 'flex'} md:flex w-full md:w-96 border-r border-gray-200 flex-col`}>
         <div className="p-3 border-b border-gray-200">
           <div className="flex rounded-lg overflow-hidden border border-gray-200">
             <button
@@ -313,12 +315,19 @@ export default function Atendimento() {
         </div>
       </div>
 
-      {/* Chat */}
+      {/* Chat — mobile: só aparece quando vistaChat está ativo */}
       {selecionado ? (
-        <div className="flex-1 flex flex-col">
+        <div className={`${vistaChat ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
             <div className="flex items-center gap-3">
+              {/* Botão voltar (mobile only) */}
+              <button
+                onClick={() => setVistaChat(false)}
+                className="md:hidden p-1 -ml-1 text-gray-500 hover:text-gray-700"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+              </button>
               <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center shrink-0">
                 {fotos[selecionado.id]
                   ? <img src={fotos[selecionado.id]} alt="" className="w-full h-full object-cover" />
@@ -447,7 +456,7 @@ export default function Atendimento() {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-gray-400">
+        <div className="hidden md:flex flex-1 items-center justify-center text-gray-400">
           <div className="text-center">
             <User size={48} className="mx-auto mb-3 opacity-50" />
             <p>Selecione uma conversa</p>

@@ -33,7 +33,7 @@ export default function Sidebar() {
         <img
           src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
           alt="Logo"
-          style={{ height: '56px', width: '100%', maxWidth: '180px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(129,140,248,0.4))' }}
+          style={{ height: '72px', width: '100%', maxWidth: '200px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 8px rgba(129,140,248,0.4))' }}
         />
       </div>
 

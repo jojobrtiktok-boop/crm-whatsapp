@@ -100,13 +100,13 @@ export default function Clientes() {
         <div className="flex gap-2">
           <button
             onClick={() => setModoVisualizacao('kanban')}
-            className={`px-3 py-1.5 text-sm rounded-lg ${modoVisualizacao === 'kanban' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            className={`hidden md:flex px-3 py-1.5 text-sm rounded-lg ${modoVisualizacao === 'kanban' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
             Kanban
           </button>
           <button
             onClick={() => setModoVisualizacao('lista')}
-            className={`px-3 py-1.5 text-sm rounded-lg ${modoVisualizacao === 'lista' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+            className={`hidden md:flex px-3 py-1.5 text-sm rounded-lg ${modoVisualizacao === 'lista' ? 'bg-primary-600 text-white' : 'bg-gray-200 text-gray-700'}`}
           >
             Lista
           </button>
@@ -115,30 +115,30 @@ export default function Clientes() {
               onClick={excluirTodos}
               className="flex items-center gap-1 px-3 py-1.5 text-sm rounded-lg bg-red-50 text-red-600 hover:bg-red-100"
             >
-              <Trash2 size={14} /> Excluir Todos
+              <Trash2 size={14} /> <span className="hidden md:inline">Excluir Todos</span><span className="md:hidden">Excluir</span>
             </button>
           )}
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="flex gap-3 flex-wrap">
-        <div className="relative flex-1 min-w-[200px]">
+      <div className="flex gap-2 flex-wrap">
+        <div className="relative flex-1 min-w-0">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome ou número..."
+            placeholder="Buscar..."
             className="w-full pl-9 pr-4 py-2 rounded-lg border-gray-300 text-sm"
           />
         </div>
         <select
           value={filtroTag}
           onChange={(e) => setFiltroTag(e.target.value)}
-          className="rounded-lg border-gray-300 text-sm"
+          className="rounded-lg border-gray-300 text-sm max-w-[120px]"
         >
-          <option value="">Todas as tags</option>
+          <option value="">Tags</option>
           {tags.map((t) => (
             <option key={t.id} value={t.id}>{t.nome}</option>
           ))}
@@ -146,18 +146,53 @@ export default function Clientes() {
         <select
           value={filtroChip}
           onChange={(e) => setFiltroChip(e.target.value)}
-          className="rounded-lg border-gray-300 text-sm"
+          className="rounded-lg border-gray-300 text-sm max-w-[120px]"
         >
-          <option value="">Todos os chips</option>
+          <option value="">Chips</option>
           {chips.map((c) => (
             <option key={c.id} value={c.id}>{c.nome}</option>
           ))}
         </select>
       </div>
 
-      {/* Kanban */}
+      {/* Mobile: lista de cards simples */}
+      <div className="md:hidden space-y-2">
+        {clientes.length === 0 && (
+          <p className="text-center text-gray-400 py-8 text-sm">Nenhum lead encontrado</p>
+        )}
+        {clientes.map((cliente) => {
+          const col = STATUS_COLUNAS.find(s => s.key === cliente.status);
+          return (
+            <div
+              key={cliente.id}
+              onClick={() => abrirDetalhe(cliente)}
+              className="bg-white rounded-xl border border-gray-200 p-3 flex items-center gap-3 cursor-pointer active:bg-gray-50"
+            >
+              <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${col?.cor || 'bg-gray-400'}`} />
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-sm text-gray-800 truncate">{cliente.nome || 'Sem nome'}</p>
+                <p className="text-xs text-gray-400 truncate">{cliente.telefone}</p>
+                {cliente.chipOrigem && (
+                  <p className="text-xs text-gray-400 truncate">{cliente.chipOrigem.nome}</p>
+                )}
+              </div>
+              <div className="flex flex-col items-end gap-1 shrink-0">
+                <span className="text-[10px] text-gray-500">{col?.label}</span>
+                <button
+                  onClick={(e) => excluirCliente(e, cliente.id)}
+                  className="text-gray-300 hover:text-red-500 p-0.5"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop: Kanban ou Lista */}
       {modoVisualizacao === 'kanban' ? (
-        <div className="flex gap-4 overflow-x-auto pb-4">
+        <div className="hidden md:flex gap-4 overflow-x-auto pb-4">
           {STATUS_COLUNAS.map((col) => (
             <div key={col.key} className="min-w-[280px] flex-shrink-0">
               <div className="flex items-center gap-2 mb-3">
@@ -208,7 +243,7 @@ export default function Clientes() {
         </div>
       ) : (
         /* Lista */
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="hidden md:block bg-white rounded-xl border border-gray-200 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 text-left text-gray-500">
