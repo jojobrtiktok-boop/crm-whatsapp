@@ -62,7 +62,7 @@ export default function Login() {
                 padding: '10px 16px',
               }}>
                 <img
-                  src="https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png"
+                  src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
                   alt="Logo"
                   style={{ height: 90, objectFit: 'contain', display: 'block', filter: 'brightness(1.1)' }}
                 />
