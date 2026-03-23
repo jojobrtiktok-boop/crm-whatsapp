@@ -34,32 +34,36 @@ export default function Sidebar() {
       </div>
 
       {/* Menu */}
-      <nav className="flex-1 py-4 overflow-y-auto space-y-0.5 px-3">
+      <nav style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
         {menuItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
             end={item.path === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
-                isActive
-                  ? 'text-white font-medium'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`
-            }
-            style={({ isActive }) => isActive ? {
-              background: 'linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.2))',
-              boxShadow: '0 0 16px rgba(99,102,241,0.2), inset 0 1px 0 rgba(255,255,255,0.06)',
-              border: '1px solid rgba(99,102,241,0.25)',
-            } : {
-              background: 'transparent',
-              border: '1px solid transparent',
-            }}
+            style={({ isActive }) => ({
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              padding: '10px 12px',
+              borderRadius: '12px',
+              fontSize: '13px',
+              fontWeight: isActive ? 600 : 400,
+              color: isActive ? '#ffffff' : '#8899aa',
+              textDecoration: 'none',
+              transition: 'all 0.2s',
+              border: isActive ? '1px solid rgba(99,102,241,0.3)' : '1px solid transparent',
+              background: isActive
+                ? 'linear-gradient(135deg, rgba(59,130,246,0.18), rgba(139,92,246,0.18))'
+                : 'transparent',
+              boxShadow: isActive ? '0 0 14px rgba(99,102,241,0.18)' : 'none',
+            })}
+            onMouseEnter={e => { if (!e.currentTarget.style.boxShadow.includes('14px')) { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#ccd6e0'; } }}
+            onMouseLeave={e => { if (!e.currentTarget.style.boxShadow.includes('14px')) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#8899aa'; } }}
           >
             {({ isActive }) => (
               <>
-                <item.icon size={17} style={isActive ? { color: '#818cf8', filter: 'drop-shadow(0 0 6px rgba(129,140,248,0.7))' } : {}} />
-                {item.label}
+                <item.icon size={17} style={{ color: isActive ? '#818cf8' : '#8899aa', filter: isActive ? 'drop-shadow(0 0 5px rgba(129,140,248,0.6))' : 'none', flexShrink: 0 }} />
+                <span>{item.label}</span>
               </>
             )}
           </NavLink>
