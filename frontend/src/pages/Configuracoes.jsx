@@ -1023,12 +1023,14 @@ function ConfigBlacklist() {
     <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
       <h3 className="font-semibold text-gray-800 mb-4">Numeros Bloqueados</h3>
 
-      <div className="flex gap-2 mb-4">
-        <input type="text" value={telefone} onChange={(e) => setTelefone(e.target.value)} className="flex-1 rounded-lg border-gray-300 text-sm" placeholder="Numero" />
-        <input type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} className="flex-1 rounded-lg border-gray-300 text-sm" placeholder="Motivo (opcional)" />
-        <button onClick={adicionar} className="bg-red-600 text-white px-4 rounded-lg text-sm hover:bg-red-700">
-          <Plus size={16} />
-        </button>
+      <div className="flex flex-col gap-2 mb-4">
+        <div className="flex gap-2">
+          <input type="text" value={telefone} onChange={(e) => setTelefone(e.target.value)} className="flex-1 rounded-lg border-gray-300 text-sm" placeholder="Número" />
+          <button onClick={adicionar} className="bg-red-600 text-white px-4 rounded-lg text-sm hover:bg-red-700">
+            <Plus size={16} />
+          </button>
+        </div>
+        <input type="text" value={motivo} onChange={(e) => setMotivo(e.target.value)} className="w-full rounded-lg border-gray-300 text-sm" placeholder="Motivo (opcional)" />
       </div>
 
       <div className="space-y-2">
