@@ -487,120 +487,194 @@ function BlocoInput({ bloco, idx, onChange, onRemove }) {
 }
 
 function ConfigUpsell() {
-  const [ativo, setAtivo] = useState(false);
-  const [tempo, setTempo] = useState('30');
-  const [unidade, setUnidade] = useState('minutos');
-  const [blocos, setBlocos] = useState([]);
+  const [upsells, setUpsells] = useState([]);
+  const [chips, setChips] = useState([]);
+  const [expandido, setExpandido] = useState({});
   const [salvando, setSalvando] = useState(false);
 
   useEffect(() => {
-    api.get('/configuracoes').then(res => {
-      const cfg = res.data;
-      setAtivo(cfg.upsell_ativo === 'true');
-      setTempo(cfg.upsell_tempo || '30');
-      setUnidade(cfg.upsell_unidade || 'minutos');
-      if (cfg.upsell_blocos) {
-        try { setBlocos(JSON.parse(cfg.upsell_blocos)); } catch { setBlocos([]); }
+    Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
+      setChips(resChips.data);
+      const cfg = resCfg.data;
+      if (cfg.upsells) {
+        try { setUpsells(JSON.parse(cfg.upsells)); } catch { setUpsells([]); }
       }
     }).catch(console.error);
   }, []);
 
-  async function salvar() {
+  async function salvarLista(lista) {
     setSalvando(true);
     try {
-      await api.put('/configuracoes', {
-        upsell_ativo: ativo ? 'true' : 'false',
-        upsell_tempo: tempo,
-        upsell_unidade: unidade,
-        upsell_blocos: JSON.stringify(blocos),
-      });
-      alert('Upsell salvo!');
+      await api.put('/configuracoes', { upsells: JSON.stringify(lista) });
     } catch { alert('Erro ao salvar'); }
     finally { setSalvando(false); }
   }
 
-  function adicionarBloco(tipo) {
-    setBlocos(prev => [...prev, { tipo, valor: '', unidade: 'minutos' }]);
+  function novoUpsell() {
+    const novo = { id: Date.now().toString(36), nome: `Upsell ${upsells.length + 1}`, ativo: true, tempo: '30', unidade: 'minutos', chipIds: [], blocos: [] };
+    const lista = [...upsells, novo];
+    setUpsells(lista);
+    setExpandido(prev => ({ ...prev, [novo.id]: true }));
+    salvarLista(lista);
   }
 
-  function atualizarBloco(idx, valor, novaUnidade) {
-    setBlocos(prev => prev.map((b, i) => i === idx
-      ? { ...b, valor, ...(novaUnidade !== undefined ? { unidade: novaUnidade } : {}) }
-      : b
-    ));
+  function update(id, campo, valor) {
+    const lista = upsells.map(u => u.id === id ? { ...u, [campo]: valor } : u);
+    setUpsells(lista);
+    return lista;
+  }
+
+  function remover(id) {
+    if (!confirm('Excluir este upsell?')) return;
+    const lista = upsells.filter(u => u.id !== id);
+    setUpsells(lista);
+    salvarLista(lista);
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
-      {/* Card principal */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6 space-y-5">
-        {/* Header toggle */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="font-semibold text-gray-800 flex items-center gap-2"><Zap size={16} style={{ color: '#f59e0b' }} /> Upsell Automático</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Sequência de mensagens enviada automaticamente após a confirmação do pagamento.</p>
-          </div>
-          <button onClick={() => setAtivo(v => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${ativo ? 'bg-primary-600' : 'bg-gray-300'}`}>
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${ativo ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
+    <div className="space-y-4 max-w-4xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-semibold text-gray-800">Upsells Automáticos</h3>
+          <p className="text-xs text-gray-500 mt-0.5">Cada upsell dispara uma sequência de mensagens após a confirmação do pagamento.</p>
         </div>
-
-        {ativo && (
-          <>
-            {/* Delay inicial */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <label className="block text-xs text-gray-600 mb-2 flex items-center gap-1"><Clock size={12} /> Iniciar upsell após</label>
-              <div className="flex gap-2">
-                <input type="number" min="1" value={tempo}
-                  onChange={e => setTempo(e.target.value)}
-                  className="w-24 rounded-lg border-gray-300 text-sm" />
-                <select value={unidade} onChange={e => setUnidade(e.target.value)}
-                  className="flex-1 rounded-lg border-gray-300 text-sm">
-                  <option value="minutos">Minutos</option>
-                  <option value="horas">Horas</option>
-                </select>
-              </div>
-              <p className="text-[10px] text-gray-400 mt-1">Tempo contado a partir do momento que o pagamento é confirmado.</p>
-            </div>
-
-            {/* Blocos */}
-            {blocos.length > 0 && (
-              <div className="space-y-2">
-                <p className="text-xs text-gray-500 font-medium">Sequência de envio</p>
-                {blocos.map((bloco, idx) => (
-                  <BlocoInput key={idx} bloco={bloco} idx={idx}
-                    onChange={(v, u) => atualizarBloco(idx, v, u)}
-                    onRemove={() => setBlocos(prev => prev.filter((_, i) => i !== idx))} />
-                ))}
-              </div>
-            )}
-
-            {/* Botões adicionar */}
-            <div>
-              <p className="text-xs text-gray-500 mb-2 font-medium">Adicionar bloco</p>
-              <div className="grid grid-cols-3 gap-2">
-                {TIPOS_BLOCO.map(({ tipo, label, icon: Icon, cor }) => {
-                  const c = COR_MAP[cor];
-                  return (
-                    <button key={tipo} onClick={() => adicionarBloco(tipo)}
-                      style={{ color: c.text, border: `1px dashed ${c.border}`, borderRadius: 10, background: 'transparent' }}
-                      className="flex items-center justify-center gap-1.5 py-2 text-xs transition-all hover:opacity-80"
-                      onMouseEnter={e => e.currentTarget.style.background = c.bg}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                      <Icon size={13} /> + {label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </>
-        )}
-
-        <button onClick={salvar} disabled={salvando}
-          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
-          <Save size={15} /> {salvando ? 'Salvando...' : 'Salvar Upsell'}
+        <button onClick={novoUpsell}
+          className="flex items-center gap-1.5 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-sm hover:bg-primary-700">
+          <Plus size={14} /> Criar Upsell
         </button>
+      </div>
+
+      {upsells.length === 0 && (
+        <div className="text-center py-14 border border-dashed border-gray-200 rounded-xl">
+          <Zap size={28} style={{ color: '#334155', margin: '0 auto 8px' }} />
+          <p className="text-sm text-gray-500">Nenhum upsell criado</p>
+          <p className="text-xs text-gray-400">Clique em "Criar Upsell" para começar</p>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {upsells.map(up => {
+          const aberto = expandido[up.id];
+          return (
+            <div key={up.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center gap-3 px-4 py-3" style={{ background: 'var(--bg-surface)', borderBottom: aberto ? '1px solid #1a2d4a' : 'none' }}>
+                <button onClick={() => { const l = update(up.id, 'ativo', !up.ativo); salvarLista(l); }}
+                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${up.ativo ? 'bg-primary-600' : 'bg-gray-300'}`}>
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${up.ativo ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                </button>
+                <input value={up.nome}
+                  onChange={e => update(up.id, 'nome', e.target.value)}
+                  onBlur={() => salvarLista(upsells)}
+                  className="flex-1 bg-transparent text-sm font-semibold outline-none border-none" />
+                <span className="text-[10px] text-gray-400 hidden sm:block">{up.blocos?.length || 0} blocos</span>
+                <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(59,130,246,0.1)', color: '#60a5fa' }}>
+                  {up.chipIds?.length === 0 ? 'Todos chips' : `${up.chipIds?.length} chip(s)`}
+                </span>
+                <span className="text-[10px] text-gray-400">{up.tempo}{up.unidade === 'horas' ? 'h' : 'min'}</span>
+                <button onClick={() => setExpandido(p => ({ ...p, [up.id]: !p[up.id] }))} style={{ color: '#475569' }}>
+                  {aberto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                </button>
+                <button onClick={() => remover(up.id)} style={{ color: '#334155' }}
+                  onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+                  onMouseLeave={e => e.currentTarget.style.color = '#334155'}>
+                  <Trash2 size={14} />
+                </button>
+              </div>
+
+              {aberto && (
+                <div className="p-4 space-y-4">
+                  {/* Delay */}
+                  <div className="bg-gray-50 rounded-lg p-3">
+                    <label className="block text-xs text-gray-500 mb-2 flex items-center gap-1"><Clock size={11} /> Enviar após confirmação</label>
+                    <div className="flex gap-2">
+                      <input type="number" min="1" value={up.tempo}
+                        onChange={e => update(up.id, 'tempo', e.target.value)}
+                        onBlur={() => salvarLista(upsells)}
+                        className="w-24 rounded-lg border-gray-300 text-sm" />
+                      <select value={up.unidade}
+                        onChange={e => { const l = update(up.id, 'unidade', e.target.value); salvarLista(l); }}
+                        className="flex-1 rounded-lg border-gray-300 text-sm">
+                        <option value="minutos">Minutos</option>
+                        <option value="horas">Horas</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Chips */}
+                  <div>
+                    <label className="block text-xs text-gray-500 mb-2 flex items-center gap-1"><Smartphone size={11} /> Chips que enviam este upsell</label>
+                    <div className="flex flex-wrap gap-2">
+                      {chips.map(chip => {
+                        const marcado = up.chipIds?.includes(chip.id);
+                        return (
+                          <button key={chip.id}
+                            onClick={() => {
+                              const atual = up.chipIds || [];
+                              const novo = marcado ? atual.filter(id => id !== chip.id) : [...atual, chip.id];
+                              const l = update(up.id, 'chipIds', novo);
+                              salvarLista(l);
+                            }}
+                            style={{
+                              padding: '4px 12px', borderRadius: 20, fontSize: 11, cursor: 'pointer',
+                              border: marcado ? '1px solid rgba(99,102,241,0.5)' : '1px solid #1a2d4a',
+                              background: marcado ? 'rgba(99,102,241,0.15)' : 'transparent',
+                              color: marcado ? '#818cf8' : '#64748b',
+                            }}>
+                            {chip.nome}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-1">
+                      {up.chipIds?.length === 0 ? 'Nenhum selecionado = dispara em todos os chips' : `${up.chipIds?.length} chip(s) selecionado(s)`}
+                    </p>
+                  </div>
+
+                  {/* Blocos */}
+                  {up.blocos?.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs text-gray-500 font-medium">Sequência de envio</p>
+                      {up.blocos.map((bloco, idx) => (
+                        <BlocoInput key={idx} bloco={bloco} idx={idx}
+                          onChange={(v, u) => {
+                            const nb = up.blocos.map((b, i) => i === idx ? { ...b, valor: v, ...(u !== undefined ? { unidade: u } : {}) } : b);
+                            update(up.id, 'blocos', nb);
+                          }}
+                          onRemove={() => { const nb = up.blocos.filter((_, i) => i !== idx); const l = update(up.id, 'blocos', nb); salvarLista(l); }} />
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Add bloco */}
+                  <div>
+                    <p className="text-xs text-gray-500 mb-2">Adicionar bloco</p>
+                    <div className="grid grid-cols-3 gap-2">
+                      {TIPOS_BLOCO.map(({ tipo, label, icon: Icon, cor }) => {
+                        const c = COR_MAP[cor];
+                        return (
+                          <button key={tipo}
+                            onClick={() => { const nb = [...(up.blocos || []), { tipo, valor: '', unidade: 'minutos' }]; const l = update(up.id, 'blocos', nb); salvarLista(l); }}
+                            style={{ color: c.text, border: `1px dashed ${c.border}`, borderRadius: 10, background: 'transparent' }}
+                            className="flex items-center justify-center gap-1.5 py-2 text-xs"
+                            onMouseEnter={e => e.currentTarget.style.background = c.bg}
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            <Icon size={13} /> + {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <button onClick={() => salvarLista(upsells)} disabled={salvando}
+                    className="flex items-center gap-2 bg-primary-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-primary-700 disabled:opacity-50">
+                    <Save size={13} /> {salvando ? 'Salvando...' : 'Salvar alterações'}
+                  </button>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
     </div>
   );

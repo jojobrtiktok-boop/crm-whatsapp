@@ -190,38 +190,40 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
           }
         }
       }
-      // Agendar upsell automático com delay, se configurado
-      if (cfgMap.upsell_ativo === 'true' && cfgMap.upsell_blocos) {
+      // Agendar upsells automáticos
+      if (cfgMap.upsells) {
         try {
-          const blocos = JSON.parse(cfgMap.upsell_blocos);
-          const unidadeMs = cfgMap.upsell_unidade === 'horas' ? 3600000 : 60000;
-          const tempoMs = parseInt(cfgMap.upsell_tempo || '30') * unidadeMs;
+          const upsells = JSON.parse(cfgMap.upsells);
           const { mensagemQueue } = require('../queues/setup');
-          let acumulado = tempoMs;
-          for (let i = 0; i < blocos.length; i++) {
-            const bloco = blocos[i];
-            if (bloco.tipo === 'delay') {
-              // Bloco delay: acumula tempo extra para os próximos blocos
-              const mult = bloco.unidade === 'horas' ? 3600000 : bloco.unidade === 'segundos' ? 1000 : 60000;
-              acumulado += parseInt(bloco.valor || '1') * mult;
-              continue;
+          for (const up of upsells) {
+            if (!up.ativo) continue;
+            // Filtro por chip: vazio = todos, senão só os selecionados
+            if (up.chipIds?.length > 0 && !up.chipIds.includes(chipId)) continue;
+            const tempoMs = parseInt(up.tempo || '30') * (up.unidade === 'horas' ? 3600000 : 60000);
+            let acumulado = tempoMs;
+            for (let i = 0; i < (up.blocos || []).length; i++) {
+              const bloco = up.blocos[i];
+              if (bloco.tipo === 'delay') {
+                const mult = bloco.unidade === 'horas' ? 3600000 : bloco.unidade === 'segundos' ? 1000 : 60000;
+                acumulado += parseInt(bloco.valor || '1') * mult;
+                continue;
+              }
+              const delay = acumulado + (i * 3000);
+              if (bloco.tipo === 'texto' && bloco.valor)
+                await mensagemQueue.add({ tipo: 'texto', instancia: instanciaEvolution, telefone: telefoneCliente, mensagem: bloco.valor }, { delay });
+              else if (bloco.tipo === 'video' && bloco.valor)
+                await mensagemQueue.add({ tipo: 'video', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
+              else if (bloco.tipo === 'imagem' && bloco.valor)
+                await mensagemQueue.add({ tipo: 'imagem', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
+              else if (bloco.tipo === 'audio' && bloco.valor)
+                await mensagemQueue.add({ tipo: 'audio', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor }, { delay });
+              else if (bloco.tipo === 'pdf' && bloco.valor)
+                await mensagemQueue.add({ tipo: 'documento', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, nomeArquivo: 'upsell.pdf' }, { delay });
             }
-            const delay = acumulado + (i * 3000);
-            if (bloco.tipo === 'texto' && bloco.valor) {
-              await mensagemQueue.add({ tipo: 'texto', instancia: instanciaEvolution, telefone: telefoneCliente, mensagem: bloco.valor }, { delay });
-            } else if (bloco.tipo === 'video' && bloco.valor) {
-              await mensagemQueue.add({ tipo: 'video', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
-            } else if (bloco.tipo === 'imagem' && bloco.valor) {
-              await mensagemQueue.add({ tipo: 'imagem', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
-            } else if (bloco.tipo === 'audio' && bloco.valor) {
-              await mensagemQueue.add({ tipo: 'audio', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor }, { delay });
-            } else if (bloco.tipo === 'pdf' && bloco.valor) {
-              await mensagemQueue.add({ tipo: 'documento', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, nomeArquivo: 'upsell.pdf' }, { delay });
-            }
+            console.log(`[Comprovante] Upsell "${up.nome}" agendado: ${up.blocos?.length || 0} blocos`);
           }
-          console.log(`[Comprovante] Upsell agendado: ${blocos.length} blocos em ${cfgMap.upsell_tempo} ${cfgMap.upsell_unidade}`);
         } catch (err) {
-          console.error('[Comprovante] Erro ao agendar upsell:', err.message);
+          console.error('[Comprovante] Erro ao processar upsells:', err.message);
         }
       }
     } else {
