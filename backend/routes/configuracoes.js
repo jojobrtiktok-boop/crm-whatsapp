@@ -63,8 +63,10 @@ router.get('/proxy/test', async (req, res) => {
       };
     }
 
-    const resp = await axios.get('https://ipinfo.io/json', { proxy: proxyConfig, timeout: 10000 });
-    res.json({ ok: true, ...resp.data });
+    // Testa com HTTP puro (mais compatível com proxies 4G)
+    const resp = await axios.get('http://ip-api.com/json', { proxy: proxyConfig, timeout: 10000 });
+    const d = resp.data;
+    res.json({ ok: true, ip: d.query, country: d.country, city: d.city, org: d.isp });
   } catch (err) {
     res.json({ ok: false, erro: err.message });
   }
