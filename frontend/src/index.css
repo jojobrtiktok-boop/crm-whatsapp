@@ -2,17 +2,145 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Scrollbar personalizada */
-::-webkit-scrollbar {
-  width: 6px;
+/* ── Dark Theme Base ─────────────────────────────────────── */
+:root {
+  --bg-base:    #060b18;
+  --bg-surface: #0d1526;
+  --bg-card:    #0f1a2e;
+  --border:     #1a2d4a;
+  --border-sub: #12233d;
+  --text-1:     #f1f5f9;
+  --text-2:     #94a3b8;
+  --text-3:     #475569;
+  --blue:       #3b82f6;
+  --purple:     #8b5cf6;
+  --grad:       linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+  --grad-hover: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+  --glow:       0 0 22px rgba(99,102,241,0.35);
+  --glow-sm:    0 0 10px rgba(99,102,241,0.2);
 }
-::-webkit-scrollbar-track {
-  background: #f1f5f9;
+
+html, body, #root {
+  background: var(--bg-base);
+  color: var(--text-1);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
 }
-::-webkit-scrollbar-thumb {
-  background: #94a3b8;
-  border-radius: 3px;
+
+/* ── Scrollbar ────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: var(--bg-surface); }
+::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #2d5080; }
+
+/* ── Cards / Surfaces ─────────────────────────────────────── */
+.bg-white           { background: var(--bg-card) !important; }
+.bg-gray-50         { background: var(--bg-surface) !important; }
+.bg-gray-100        { background: #0d1a2e !important; }
+.bg-gray-200        { background: var(--border) !important; }
+
+/* ── Borders ──────────────────────────────────────────────── */
+.border-gray-100,
+.border-gray-200    { border-color: var(--border-sub) !important; }
+.border-gray-300    { border-color: var(--border) !important; }
+.border-b           { border-bottom-color: var(--border-sub) !important; }
+.border-t           { border-top-color: var(--border-sub) !important; }
+.divide-y > * + *   { border-top-color: var(--border-sub) !important; }
+
+/* ── Typography ───────────────────────────────────────────── */
+.text-gray-900,
+.text-gray-800      { color: var(--text-1) !important; }
+.text-gray-700      { color: #cbd5e1 !important; }
+.text-gray-600      { color: #94a3b8 !important; }
+.text-gray-500      { color: #64748b !important; }
+.text-gray-400      { color: #3d5270 !important; }
+.text-gray-300      { color: #2d4060 !important; }
+
+/* ── Primary Accent ───────────────────────────────────────── */
+.bg-primary-600,
+.bg-primary-700     { background: var(--grad) !important; box-shadow: var(--glow-sm); }
+.hover\:bg-primary-700:hover { background: var(--grad-hover) !important; box-shadow: var(--glow); }
+.bg-primary-600\/20 { background: rgba(99,102,241,0.12) !important; }
+.bg-primary-50      { background: rgba(99,102,241,0.08) !important; }
+.bg-primary-100     { background: rgba(99,102,241,0.12) !important; }
+.text-primary-600   { color: #818cf8 !important; }
+.text-primary-400   { color: #a5b4fc !important; }
+.border-primary-600 { border-color: #4f46e5 !important; }
+.border-primary-400 { border-color: #818cf8 !important; }
+
+/* ── Green States (connected, confirmed) ─────────────────── */
+.bg-green-50        { background: rgba(16,185,129,0.08) !important; }
+.bg-green-100       { background: rgba(16,185,129,0.12) !important; }
+.border-green-200   { border-color: rgba(16,185,129,0.2) !important; }
+
+/* ── Red States ───────────────────────────────────────────── */
+.bg-red-50          { background: rgba(239,68,68,0.08) !important; }
+.bg-red-100         { background: rgba(239,68,68,0.12) !important; }
+.border-red-200     { border-color: rgba(239,68,68,0.2) !important; }
+
+/* ── Yellow States ────────────────────────────────────────── */
+.bg-yellow-50       { background: rgba(245,158,11,0.08) !important; }
+.border-yellow-200  { border-color: rgba(245,158,11,0.2) !important; }
+.text-yellow-800    { color: #fbbf24 !important; }
+
+/* ── Blue States ──────────────────────────────────────────── */
+.bg-blue-50         { background: rgba(59,130,246,0.08) !important; }
+.bg-blue-100        { background: rgba(59,130,246,0.12) !important; }
+.border-blue-200    { border-color: rgba(59,130,246,0.2) !important; }
+.text-blue-500,
+.text-blue-600      { color: #60a5fa !important; }
+
+/* ── Form Inputs ──────────────────────────────────────────── */
+input:not([type=checkbox]):not([type=radio]),
+select,
+textarea {
+  background: var(--bg-surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-1) !important;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
+input::placeholder, textarea::placeholder {
+  color: var(--text-3) !important;
 }
+input:focus, select:focus, textarea:focus {
+  border-color: var(--blue) !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15), 0 0 12px rgba(59,130,246,0.1) !important;
+  outline: none;
+}
+option { background: #0d1526; color: #f1f5f9; }
+
+/* ── Hover States ─────────────────────────────────────────── */
+.hover\:bg-gray-50:hover  { background: var(--bg-surface) !important; }
+.hover\:bg-gray-100:hover { background: #0d1a2e !important; }
+.hover\:bg-gray-200:hover { background: var(--border) !important; }
+
+/* ── Gradient Button ──────────────────────────────────────── */
+.btn-gradient {
+  background: var(--grad);
+  box-shadow: var(--glow-sm);
+  color: white;
+  border: none;
+  transition: box-shadow 0.2s, transform 0.1s;
+}
+.btn-gradient:hover {
+  background: var(--grad-hover);
+  box-shadow: var(--glow);
+  transform: translateY(-1px);
+}
+
+/* ── Glow Card ────────────────────────────────────────────── */
+.card-glow {
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03);
+  border-radius: 14px;
+}
+
+/* ── Modal Overlay ────────────────────────────────────────── */
+.bg-black\/50 { background: rgba(0,0,0,0.7) !important; }
+
+/* ── Rounded-xl cards glow on hover ──────────────────────── */
+.rounded-xl {
+  transition: box-shadow 0.2s;
+}
+
+/* ── Table/List alternates ────────────────────────────────── */
+.border-b.border-gray-100:last-child { border: none !important; }

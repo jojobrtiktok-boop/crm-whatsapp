@@ -11,17 +11,17 @@ const items = [
 
 export default function BottomNav() {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gray-900 border-t border-gray-700 flex z-40">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 flex z-40"
+      style={{ background: 'rgba(8,15,31,0.95)', backdropFilter: 'blur(16px)', borderTop: '1px solid #1a2d4a' }}>
       {items.map((item) => (
         <NavLink
           key={item.path}
           to={item.path}
           end={item.path === '/'}
-          className={({ isActive }) =>
-            `flex-1 flex flex-col items-center justify-center py-2 gap-0.5 text-[10px] transition-colors ${
-              isActive ? 'text-primary-400' : 'text-gray-400'
-            }`
-          }
+          className="flex-1 flex flex-col items-center justify-center py-2.5 gap-0.5 text-[10px] transition-all"
+          style={({ isActive }) => isActive
+            ? { color: '#818cf8', filter: 'drop-shadow(0 0 6px rgba(129,140,248,0.8))' }
+            : { color: '#3d5270' }}
         >
           <item.icon size={20} />
           {item.label}

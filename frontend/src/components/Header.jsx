@@ -5,7 +5,6 @@ import { useSocketEvent } from '../hooks/useSocket';
 export default function Header() {
   const [notificacoes, setNotificacoes] = useState([]);
 
-  // Escutar eventos de notificação em tempo real
   const handleNovoAtendimento = useCallback((data) => {
     setNotificacoes((prev) => [
       { id: Date.now(), texto: `Novo atendimento: ${data.cliente?.nome || 'Lead'}`, tipo: 'atendimento' },
@@ -25,18 +24,24 @@ export default function Header() {
   useSocketEvent('comprovante:analisado', handleComprovante);
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+    <header className="h-14 flex items-center justify-between px-6"
+      style={{ background: 'rgba(6,11,24,0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1a2d4a' }}>
       <div>
-        <h2 className="text-lg font-semibold text-gray-800">Painel de Controle</h2>
+        <h2 className="text-sm font-semibold text-white tracking-wide">Painel de Controle</h2>
       </div>
 
-      <div className="flex items-center gap-4">
-        {/* Notificações */}
+      <div className="flex items-center gap-3">
         <div className="relative">
-          <button className="relative text-gray-500 hover:text-gray-700">
-            <Bell size={20} />
+          <button
+            className="relative p-2 rounded-xl transition-all"
+            style={{ color: '#475569', border: '1px solid #1a2d4a', background: '#0d1526' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa'; e.currentTarget.style.boxShadow = '0 0 10px rgba(59,130,246,0.2)'; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a2d4a'; e.currentTarget.style.color = '#475569'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
+            <Bell size={16} />
             {notificacoes.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 text-white text-[9px] w-4 h-4 rounded-full flex items-center justify-center font-bold"
+                style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
                 {notificacoes.length}
               </span>
             )}
