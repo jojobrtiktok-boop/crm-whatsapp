@@ -26,7 +26,7 @@ export default function Header() {
   // Desktop: header escondido (sino fica na Sidebar)
   return (
     <header className="md:hidden h-20 flex items-center justify-between px-4 relative"
-      style={{ background: 'rgba(6,11,24,0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1a2d4a' }}>
+      style={{ background: 'rgba(6,11,24,0.9)', backdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(129,140,248,0.35)', boxShadow: '0 2px 20px rgba(129,140,248,0.12)' }}>
       {/* Mobile: logo centralizada */}
       <div className="absolute left-1/2 -translate-x-1/2">
         <img
@@ -39,7 +39,7 @@ export default function Header() {
       <div className="relative">
         <button
           className="relative p-2 rounded-xl transition-all"
-          style={{ color: '#475569', border: '1px solid #1a2d4a', background: '#0d1526' }}
+          style={{ color: '#818cf8', border: '1px solid rgba(129,140,248,0.45)', background: 'rgba(129,140,248,0.08)', boxShadow: '0 0 12px rgba(129,140,248,0.3)' }}
         >
           <Bell size={16} />
           {notificacoes.length > 0 && (

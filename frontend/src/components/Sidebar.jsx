@@ -81,7 +81,7 @@ export default function Sidebar() {
       style={{ background: 'linear-gradient(180deg, #080f1f 0%, #060b18 100%)', borderRight: '1px solid #1a2d4a' }}>
 
       {/* Logo */}
-      <div className="flex items-center justify-center px-3 py-2" style={{ borderBottom: '1px solid #1a2d4a' }}>
+      <div className="flex items-center justify-center px-3 py-2" style={{ borderBottom: '1px solid rgba(129,140,248,0.35)', boxShadow: '0 2px 16px rgba(129,140,248,0.1)' }}>
         <img
           src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
           alt="Logo"
@@ -127,17 +127,17 @@ export default function Sidebar() {
       </nav>
 
       {/* Usuário */}
-      <div className="px-4 py-4" style={{ borderTop: '1px solid #1a2d4a' }}>
+      <div className="px-4 py-4" style={{ borderTop: '1px solid rgba(129,140,248,0.35)', boxShadow: '0 -2px 16px rgba(129,140,248,0.1)' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             {/* Sino de notificações */}
             <div className="relative">
               <button
                 className="relative p-1.5 rounded-lg transition-all"
-                style={{ color: '#475569', border: '1px solid #1a2d4a', background: '#0d1526' }}
+                style={{ color: '#a78bfa', border: '1px solid rgba(129,140,248,0.45)', background: 'rgba(129,140,248,0.08)', boxShadow: '0 0 12px rgba(129,140,248,0.3)' }}
                 onClick={ativarNotificacoes}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a2d4a'; e.currentTarget.style.color = '#475569'; }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(129,140,248,0.6)'; e.currentTarget.style.borderColor = 'rgba(129,140,248,0.7)'; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 12px rgba(129,140,248,0.3)'; e.currentTarget.style.borderColor = 'rgba(129,140,248,0.45)'; }}
                 title={Notification?.permission === 'granted' ? 'Notificações ativas — clique para limpar' : 'Clique para ativar notificações de vendas'}
               >
                 <Bell size={14} />
