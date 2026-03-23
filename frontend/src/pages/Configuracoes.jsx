@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -49,13 +49,11 @@ function ConfigFunis() {
   const [funis, setFunis] = useState([]);
   const [chips, setChips] = useState([]);
   const [vinculacoes, setVinculacoes] = useState([]);
-  const [chipSelecionado, setChipSelecionado] = useState('');
-  const [funilSelecionado, setFunilSelecionado] = useState('');
   const [salvando, setSalvando] = useState(false);
+  const [adicionandoFunil, setAdicionandoFunil] = useState(null); // chipId
+  const [expandido, setExpandido] = useState({}); // { chipId_funilIdx: bool }
 
-  useEffect(() => {
-    carregarDados();
-  }, []);
+  useEffect(() => { carregarDados(); }, []);
 
   async function carregarDados() {
     try {
@@ -66,66 +64,20 @@ function ConfigFunis() {
       ]);
       setFunis(resFunis.data);
       setChips(resChips.data);
-
-      // Carregar vinculacoes salvas
       const vincs = resConfigs.data.funis_vinculados;
       if (vincs) {
-        try {
-          setVinculacoes(JSON.parse(vincs));
-        } catch {
-          setVinculacoes([]);
-        }
+        try { setVinculacoes(JSON.parse(vincs)); } catch { setVinculacoes([]); }
       }
     } catch (err) {
       console.error('Erro ao carregar dados:', err);
     }
   }
 
-  async function adicionarVinculacao() {
-    if (!chipSelecionado || !funilSelecionado) {
-      alert('Selecione um chip e um funil');
-      return;
-    }
-
-    // Verificar se ja existe vinculacao para esse chip
-    const jaExiste = vinculacoes.find(v => v.chipId === parseInt(chipSelecionado));
-    if (jaExiste) {
-      alert('Este chip ja tem um funil vinculado. Remova primeiro.');
-      return;
-    }
-
-    const novaVinculacao = {
-      chipId: parseInt(chipSelecionado),
-      funilId: parseInt(funilSelecionado),
-      ativo: true,
-      gatilho: 'uma_vez',
-      palavras: [],
-    };
-
-    const novasVinculacoes = [...vinculacoes, novaVinculacao];
-    await salvarVinculacoes(novasVinculacoes);
-    setChipSelecionado('');
-    setFunilSelecionado('');
-  }
-
-  async function toggleVinculacao(index) {
-    const novasVinculacoes = [...vinculacoes];
-    novasVinculacoes[index].ativo = !novasVinculacoes[index].ativo;
-    await salvarVinculacoes(novasVinculacoes);
-  }
-
-  async function removerVinculacao(index) {
-    const novasVinculacoes = vinculacoes.filter((_, i) => i !== index);
-    await salvarVinculacoes(novasVinculacoes);
-  }
-
-  async function salvarVinculacoes(novasVinculacoes) {
+  async function salvarVinculacoes(novas) {
     setSalvando(true);
     try {
-      await api.put('/configuracoes', {
-        funis_vinculados: JSON.stringify(novasVinculacoes),
-      });
-      setVinculacoes(novasVinculacoes);
+      await api.put('/configuracoes', { funis_vinculados: JSON.stringify(novas) });
+      setVinculacoes(novas);
     } catch (err) {
       alert('Erro ao salvar: ' + (err.response?.data?.erro || err.message));
     } finally {
@@ -133,8 +85,30 @@ function ConfigFunis() {
     }
   }
 
-  function getNomeChip(chipId) {
-    return chips.find(c => c.id === chipId)?.nome || `Chip #${chipId}`;
+  function adicionarFunil(chipId, funilId) {
+    const jaExiste = vinculacoes.find(v => v.chipId === chipId && v.funilId === funilId);
+    if (jaExiste) return;
+    const novas = [...vinculacoes, { chipId, funilId, ativo: true, gatilho: 'uma_vez', palavras: [] }];
+    salvarVinculacoes(novas);
+    setAdicionandoFunil(null);
+  }
+
+  function removerVinculacao(chipId, funilId) {
+    salvarVinculacoes(vinculacoes.filter(v => !(v.chipId === chipId && v.funilId === funilId)));
+  }
+
+  function toggleVinculacao(chipId, funilId) {
+    const novas = vinculacoes.map(v =>
+      v.chipId === chipId && v.funilId === funilId ? { ...v, ativo: !v.ativo } : v
+    );
+    salvarVinculacoes(novas);
+  }
+
+  function atualizarVinculacao(chipId, funilId, campo, valor) {
+    const novas = vinculacoes.map(v =>
+      v.chipId === chipId && v.funilId === funilId ? { ...v, [campo]: valor } : v
+    );
+    salvarVinculacoes(novas);
   }
 
   function getNomeFunil(funilId) {
@@ -142,122 +116,142 @@ function ConfigFunis() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl">
-      <h3 className="font-semibold text-gray-800 mb-2">Ativar Funis por Chip</h3>
-      <p className="text-xs text-gray-500 mb-4">
-        Vincule um funil a um chip. Quando uma nova mensagem chegar nesse chip, o funil sera iniciado automaticamente para o lead (uma vez por pessoa).
-      </p>
-
-      {/* Formulario de vinculacao */}
-      <div className="flex gap-2 mb-4">
-        <select
-          value={chipSelecionado}
-          onChange={(e) => setChipSelecionado(e.target.value)}
-          className="flex-1 rounded-lg border-gray-300 text-sm"
-        >
-          <option value="">Selecione o Chip</option>
-          {chips.filter(c => c.ativo !== false).map((chip) => (
-            <option key={chip.id} value={chip.id}>{chip.nome} ({chip.numero})</option>
-          ))}
-        </select>
-        <select
-          value={funilSelecionado}
-          onChange={(e) => setFunilSelecionado(e.target.value)}
-          className="flex-1 rounded-lg border-gray-300 text-sm"
-        >
-          <option value="">Selecione o Funil</option>
-          {funis.map((funil) => (
-            <option key={funil.id} value={funil.id}>{funil.nome}</option>
-          ))}
-        </select>
-        <button
-          onClick={adicionarVinculacao}
-          disabled={salvando}
-          className="bg-primary-600 text-white px-4 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-        >
-          <Plus size={16} />
-        </button>
+    <div className="space-y-4 max-w-4xl">
+      <div>
+        <h3 className="font-semibold text-gray-800">Funis por Chip</h3>
+        <p className="text-xs text-gray-500 mt-0.5">Cada chip pode ter um ou mais funis. Quando uma mensagem chegar, os funis ativos disparam automaticamente.</p>
       </div>
 
-      {/* Lista de vinculacoes */}
-      <div className="space-y-3">
-        {vinculacoes.map((vinc, index) => (
-          <div key={index} className="border border-gray-100 rounded-lg bg-gray-50 overflow-hidden">
-            <div className="flex items-center justify-between py-3 px-3">
-              <div className="flex items-center gap-3">
-                <div className={`p-1.5 rounded-lg ${vinc.ativo ? 'bg-green-100' : 'bg-gray-200'}`}>
-                  <Smartphone size={14} className={vinc.ativo ? 'text-green-600' : 'text-gray-400'} />
+      {chips.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-8">Nenhum chip cadastrado. Adicione chips primeiro.</p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {chips.map((chip) => {
+          const isConectado = chip.statusConexao === 'open' || chip.statusConexao === 'connected';
+          const vincsDoChip = vinculacoes.filter(v => v.chipId === chip.id);
+          const funisDisponiveis = funis.filter(f => !vincsDoChip.find(v => v.funilId === f.id));
+
+          return (
+            <div key={chip.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              {/* Header do chip */}
+              <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <div className={`p-1.5 rounded-lg ${isConectado ? 'bg-green-100' : 'bg-gray-100'}`}>
+                  <Smartphone size={14} className={isConectado ? 'text-green-600' : 'text-gray-400'} />
                 </div>
-                <div>
-                  <p className="text-sm font-medium">{getNomeChip(vinc.chipId)}</p>
-                  <p className="text-xs text-gray-500">
-                    <GitBranch size={10} className="inline mr-1" />
-                    {getNomeFunil(vinc.funilId)}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</p>
+                  <p className={`text-[10px] ${isConectado ? 'text-green-500' : 'text-gray-400'}`}>
+                    {isConectado ? 'Conectado' : 'Desconectado'}
                   </p>
                 </div>
+                <span className="text-xs text-gray-400">{vincsDoChip.length} funil{vincsDoChip.length !== 1 ? 'is' : ''}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => toggleVinculacao(index)}
-                  className={`p-1.5 rounded-lg ${vinc.ativo ? 'bg-green-100 text-green-600' : 'bg-gray-200 text-gray-400'}`}
-                  title={vinc.ativo ? 'Pausar' : 'Ativar'}
-                >
-                  {vinc.ativo ? <Play size={14} /> : <Pause size={14} />}
-                </button>
-                <span className={`text-xs px-2 py-0.5 rounded-full ${vinc.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                  {vinc.ativo ? 'Ativo' : 'Pausado'}
-                </span>
-                <button onClick={() => removerVinculacao(index)} className="text-gray-400 hover:text-red-500">
-                  <Trash2 size={14} />
-                </button>
+
+              {/* Funis vinculados */}
+              <div className="divide-y divide-gray-50">
+                {vincsDoChip.length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-4">Nenhum funil ativo</p>
+                )}
+                {vincsDoChip.map((vinc) => {
+                  const key = `${chip.id}_${vinc.funilId}`;
+                  const aberto = expandido[key];
+                  return (
+                    <div key={vinc.funilId} className="px-4 py-2.5">
+                      <div className="flex items-center gap-2">
+                        <GitBranch size={12} className="text-primary-500 shrink-0" />
+                        <span className="text-sm flex-1 truncate">{getNomeFunil(vinc.funilId)}</span>
+                        {/* Toggle ativo */}
+                        <button
+                          onClick={() => toggleVinculacao(chip.id, vinc.funilId)}
+                          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors shrink-0 ${vinc.ativo ? 'bg-primary-600' : 'bg-gray-300'}`}
+                        >
+                          <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${vinc.ativo ? 'translate-x-4.5' : 'translate-x-0.5'}`} />
+                        </button>
+                        {/* Expandir config */}
+                        <button
+                          onClick={() => setExpandido(prev => ({ ...prev, [key]: !prev[key] }))}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          {aberto ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                        <button onClick={() => removerVinculacao(chip.id, vinc.funilId)} className="text-gray-300 hover:text-red-500">
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+
+                      {/* Config expandida */}
+                      {aberto && (
+                        <div className="mt-2 ml-5 space-y-2 bg-gray-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2">
+                            <label className="text-xs text-gray-500 w-14 shrink-0">Gatilho</label>
+                            <select
+                              value={vinc.gatilho || 'uma_vez'}
+                              onChange={(e) => atualizarVinculacao(chip.id, vinc.funilId, 'gatilho', e.target.value)}
+                              className="text-xs rounded border-gray-300 py-1 flex-1"
+                            >
+                              <option value="uma_vez">Uma vez por numero</option>
+                              <option value="sempre">Sempre (toda mensagem)</option>
+                              <option value="palavras">Palavras especificas</option>
+                            </select>
+                          </div>
+                          {(vinc.gatilho || 'uma_vez') === 'palavras' && (
+                            <div className="flex items-start gap-2">
+                              <label className="text-xs text-gray-500 w-14 shrink-0 pt-1">Palavras</label>
+                              <div className="flex-1">
+                                <input
+                                  type="text"
+                                  defaultValue={(vinc.palavras || []).join(', ')}
+                                  onBlur={(e) => {
+                                    const palavras = e.target.value.split(',').map(p => p.trim()).filter(Boolean);
+                                    atualizarVinculacao(chip.id, vinc.funilId, 'palavras', palavras);
+                                  }}
+                                  className="w-full text-xs rounded border-gray-300 py-1"
+                                  placeholder="oi, ola, quero"
+                                />
+                                <p className="text-[10px] text-gray-400 mt-0.5">Separe por virgula.</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            {/* Configuração do gatilho */}
-            <div className="border-t border-gray-100 px-3 py-2 bg-white space-y-2">
-              <div className="flex items-center gap-3">
-                <label className="text-xs text-gray-500 w-16 shrink-0">Gatilho</label>
-                <select
-                  value={vinc.gatilho || 'uma_vez'}
-                  onChange={(e) => {
-                    const novas = [...vinculacoes];
-                    novas[index] = { ...novas[index], gatilho: e.target.value, palavras: novas[index].palavras || [] };
-                    salvarVinculacoes(novas);
-                  }}
-                  className="text-xs rounded border-gray-300 py-1"
-                >
-                  <option value="uma_vez">Uma vez por numero</option>
-                  <option value="sempre">Sempre (toda mensagem)</option>
-                  <option value="palavras">Palavras especificas</option>
-                </select>
-              </div>
-              {(vinc.gatilho || 'uma_vez') === 'palavras' && (
-                <div className="flex items-start gap-3">
-                  <label className="text-xs text-gray-500 w-16 shrink-0 pt-1">Palavras</label>
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      defaultValue={(vinc.palavras || []).join(', ')}
-                      onBlur={(e) => {
-                        const palavras = e.target.value.split(',').map(p => p.trim()).filter(Boolean);
-                        const novas = [...vinculacoes];
-                        novas[index] = { ...novas[index], palavras };
-                        salvarVinculacoes(novas);
-                      }}
-                      className="w-full text-xs rounded border-gray-300 py-1"
-                      placeholder="oi, ola, quero, boa tarde"
-                    />
-                    <p className="text-[10px] text-gray-400 mt-0.5">Separe por virgula. Qualquer uma das palavras dispara o funil.</p>
+
+              {/* Adicionar funil */}
+              <div className="px-4 pb-3 pt-1">
+                {adicionandoFunil === chip.id ? (
+                  <div className="flex gap-2">
+                    <select
+                      autoFocus
+                      className="flex-1 text-xs rounded-lg border-gray-300 py-1.5"
+                      defaultValue=""
+                      onChange={(e) => e.target.value && adicionarFunil(chip.id, parseInt(e.target.value))}
+                    >
+                      <option value="">Escolha um funil...</option>
+                      {funisDisponiveis.map(f => (
+                        <option key={f.id} value={f.id}>{f.nome}</option>
+                      ))}
+                    </select>
+                    <button onClick={() => setAdicionandoFunil(null)} className="text-gray-400 hover:text-gray-600 text-xs px-2">
+                      <Trash2 size={13} />
+                    </button>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <button
+                    onClick={() => setAdicionandoFunil(chip.id)}
+                    disabled={funisDisponiveis.length === 0}
+                    className="w-full flex items-center justify-center gap-1 text-xs text-primary-600 hover:text-primary-700 py-1.5 border border-dashed border-primary-300 rounded-lg hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={12} /> Adicionar Funil
+                  </button>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
-        {vinculacoes.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-6">
-            Nenhum funil vinculado. Selecione um chip e um funil acima para ativar.
-          </p>
-        )}
+          );
+        })}
       </div>
     </div>
   );
