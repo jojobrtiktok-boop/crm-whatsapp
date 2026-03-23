@@ -4,6 +4,7 @@
 
 const express = require('express');
 const baileys = require('@whiskeysockets/baileys');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 const makeWASocket = baileys.default || baileys.makeWASocket || baileys;
 const {
   useMultiFileAuthState,
@@ -24,6 +25,7 @@ const app = express();
 app.use(express.json({ limit: '100mb' }));
 
 const SECRET_KEY = process.env.SECRET_KEY || 'THISISMYSECURETOKEN';
+const PROXY_URL = process.env.PROXY_URL || null;
 const PORT = parseInt(process.env.PORT || '21465');
 const AUTH_DIR = process.env.AUTH_DIR || path.join(__dirname, 'sessions');
 // Salvar na pasta uploads do CRM para o webhook servir corretamente
@@ -334,7 +336,7 @@ async function startBaileysSession(sessionName) {
 
   console.log(`[${sessionName}] Iniciando sessão Baileys v${version.join('.')}`);
 
-  const socket = makeWASocket({
+  const socketOptions = {
     version,
     auth: state,
     printQRInTerminal: false,
@@ -343,7 +345,14 @@ async function startBaileysSession(sessionName) {
     connectTimeoutMs: 60000,
     defaultQueryTimeoutMs: 30000,
     retryRequestDelayMs: 2000,
-  });
+  };
+
+  if (PROXY_URL) {
+    const agent = new SocksProxyAgent(PROXY_URL);
+    socketOptions.agent = agent;
+  }
+
+  const socket = makeWASocket(socketOptions);
 
   sess.socket = socket;
 

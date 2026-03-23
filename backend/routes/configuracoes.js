@@ -3,6 +3,7 @@ const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const { autenticar, apenasAdmin } = require('../middleware/auth');
 const axios = require('axios');
+const { SocksProxyAgent } = require('socks-proxy-agent');
 
 const prisma = new PrismaClient();
 
@@ -50,21 +51,26 @@ router.get('/proxy/test', async (req, res) => {
     });
     if (!config?.valor) return res.json({ ok: false, erro: 'Nenhum proxy configurado' });
 
-    const proxyUrl = new URL(config.valor);
-    const proxyConfig = {
-      protocol: proxyUrl.protocol,
-      host: proxyUrl.hostname,
-      port: parseInt(proxyUrl.port) || 80,
-    };
-    if (proxyUrl.username) {
-      proxyConfig.auth = {
-        username: decodeURIComponent(proxyUrl.username),
-        password: decodeURIComponent(proxyUrl.password),
+    const proxyUrlStr = config.valor;
+    const isSocks = proxyUrlStr.startsWith('socks');
+    let resp;
+
+    if (isSocks) {
+      const agent = new SocksProxyAgent(proxyUrlStr);
+      resp = await axios.get('http://ip-api.com/json', { httpAgent: agent, httpsAgent: agent, proxy: false, timeout: 10000 });
+    } else {
+      const proxyUrl = new URL(proxyUrlStr);
+      const proxyConfig = {
+        protocol: proxyUrl.protocol,
+        host: proxyUrl.hostname,
+        port: parseInt(proxyUrl.port) || 80,
       };
+      if (proxyUrl.username) {
+        proxyConfig.auth = { username: decodeURIComponent(proxyUrl.username), password: decodeURIComponent(proxyUrl.password) };
+      }
+      resp = await axios.get('http://ip-api.com/json', { proxy: proxyConfig, timeout: 10000 });
     }
 
-    // Testa com HTTP puro (mais compatível com proxies 4G)
-    const resp = await axios.get('http://ip-api.com/json', { proxy: proxyConfig, timeout: 10000 });
     const d = resp.data;
     res.json({ ok: true, ip: d.query, country: d.country, city: d.city, org: d.isp });
   } catch (err) {
