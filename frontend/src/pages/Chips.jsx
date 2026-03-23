@@ -341,7 +341,7 @@ export default function Chips() {
       {/* Modal de conexao */}
       {modalConexao && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl w-full max-w-sm p-6 text-center">
+          <div className="bg-white rounded-xl w-full max-w-sm p-6 text-center" style={{ border: '1px solid rgba(139,92,246,0.6)', boxShadow: '0 0 40px rgba(139,92,246,0.35), 0 0 80px rgba(139,92,246,0.15), inset 0 0 30px rgba(139,92,246,0.05)' }}>
             {conectado ? (
               <>
                 <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
