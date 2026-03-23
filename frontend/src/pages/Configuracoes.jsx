@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp, Film, Type, FileText } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 
@@ -263,6 +263,7 @@ function ConfigPagamento() {
   const [etiquetas, setEtiquetas] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [carregandoEtiquetas, setCarregandoEtiquetas] = useState(false);
+  const [upsellBlocos, setUpsellBlocos] = useState([]);
 
   useEffect(() => {
     Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
@@ -273,8 +274,15 @@ function ConfigPagamento() {
         msg_pagamento_confirmado: cfg.msg_pagamento_confirmado || '',
         etiqueta_pagamento_ativa: cfg.etiqueta_pagamento_ativa === 'true',
         etiqueta_pagamento_id: cfg.etiqueta_pagamento_id || '',
+        confirmacao_pdf_ativo: cfg.confirmacao_pdf_ativo === 'true',
+        confirmacao_pdf_url: cfg.confirmacao_pdf_url || '',
+        upsell_ativo: cfg.upsell_ativo === 'true',
+        upsell_tempo: cfg.upsell_tempo || '30',
+        upsell_unidade: cfg.upsell_unidade || 'minutos',
       });
-      // Carregar etiquetas do primeiro chip conectado
+      if (cfg.upsell_blocos) {
+        try { setUpsellBlocos(JSON.parse(cfg.upsell_blocos)); } catch { setUpsellBlocos([]); }
+      }
       if (chipsConectados.length > 0) {
         buscarEtiquetas(chipsConectados[0].id);
       }
@@ -300,8 +308,14 @@ function ConfigPagamento() {
         msg_pagamento_confirmado: configs.msg_pagamento_confirmado,
         etiqueta_pagamento_ativa: configs.etiqueta_pagamento_ativa ? 'true' : 'false',
         etiqueta_pagamento_id: configs.etiqueta_pagamento_id,
+        confirmacao_pdf_ativo: configs.confirmacao_pdf_ativo ? 'true' : 'false',
+        confirmacao_pdf_url: configs.confirmacao_pdf_url,
+        upsell_ativo: configs.upsell_ativo ? 'true' : 'false',
+        upsell_tempo: configs.upsell_tempo,
+        upsell_unidade: configs.upsell_unidade,
+        upsell_blocos: JSON.stringify(upsellBlocos),
       });
-      alert('Configuracoes salvas!');
+      alert('Configurações salvas!');
     } catch {
       alert('Erro ao salvar');
     } finally {
@@ -309,13 +323,25 @@ function ConfigPagamento() {
     }
   }
 
+  function adicionarBloco(tipo) {
+    setUpsellBlocos(prev => [...prev, { tipo, valor: '' }]);
+  }
+
+  function atualizarBloco(idx, valor) {
+    setUpsellBlocos(prev => prev.map((b, i) => i === idx ? { ...b, valor } : b));
+  }
+
+  function removerBloco(idx) {
+    setUpsellBlocos(prev => prev.filter((_, i) => i !== idx));
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl space-y-6">
       {/* Mensagem de confirmação */}
       <div>
-        <h3 className="font-semibold text-gray-800 mb-1">Mensagem de Confirmacao de Pagamento</h3>
+        <h3 className="font-semibold text-gray-800 mb-1">Mensagem de Confirmação de Pagamento</h3>
         <p className="text-xs text-gray-500 mb-3">
-          Mensagem enviada automaticamente ao cliente quando o comprovante e aprovado. Use <code className="bg-gray-100 px-1 rounded">{'{valor}'}</code> para inserir o valor pago. Se vazio, usa o idioma padrao do pais do chip.
+          Enviada automaticamente ao confirmar comprovante. Use <code className="bg-gray-100 px-1 rounded">{'{valor}'}</code> para inserir o valor. Se vazio, usa o idioma padrão do chip.
         </p>
         <textarea
           value={configs.msg_pagamento_confirmado || ''}
@@ -326,14 +352,41 @@ function ConfigPagamento() {
         />
       </div>
 
+      {/* PDF junto com confirmação */}
+      <div className="border-t border-gray-100 pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold text-gray-800 flex items-center gap-1.5"><FileText size={15} /> Enviar PDF com a confirmação</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Envia um documento PDF após a mensagem de confirmação.</p>
+          </div>
+          <button
+            onClick={() => setConfigs(prev => ({ ...prev, confirmacao_pdf_ativo: !prev.confirmacao_pdf_ativo }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configs.confirmacao_pdf_ativo ? 'bg-primary-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configs.confirmacao_pdf_ativo ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+        {configs.confirmacao_pdf_ativo && (
+          <div className="bg-gray-50 rounded-lg p-4">
+            <label className="block text-xs text-gray-600 mb-1">URL do PDF</label>
+            <input
+              type="text"
+              value={configs.confirmacao_pdf_url || ''}
+              onChange={(e) => setConfigs(prev => ({ ...prev, confirmacao_pdf_url: e.target.value }))}
+              className="w-full rounded-lg border-gray-300 text-sm"
+              placeholder="https://exemplo.com/recibo.pdf"
+            />
+            <p className="text-[10px] text-gray-400 mt-1">Link público acessível. Será enviado logo após a mensagem de confirmação.</p>
+          </div>
+        )}
+      </div>
+
       {/* Etiqueta automática */}
       <div className="border-t border-gray-100 pt-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="font-semibold text-gray-800">Etiqueta Automatica no WhatsApp</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Ao confirmar pagamento, etiqueta o contato no WhatsApp Business automaticamente.
-            </p>
+            <h3 className="font-semibold text-gray-800">Etiqueta Automática no WhatsApp</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Etiqueta o contato em todos os chips ao confirmar pagamento.</p>
           </div>
           <button
             onClick={() => setConfigs(prev => ({ ...prev, etiqueta_pagamento_ativa: !prev.etiqueta_pagamento_ativa }))}
@@ -375,12 +428,107 @@ function ConfigPagamento() {
         )}
       </div>
 
+      {/* Upsell automático */}
+      <div className="border-t border-gray-100 pt-5">
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <h3 className="font-semibold text-gray-800">Upsell Automático</h3>
+            <p className="text-xs text-gray-500 mt-0.5">Envia mensagens automaticamente após a confirmação do pagamento.</p>
+          </div>
+          <button
+            onClick={() => setConfigs(prev => ({ ...prev, upsell_ativo: !prev.upsell_ativo }))}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configs.upsell_ativo ? 'bg-primary-600' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configs.upsell_ativo ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        {configs.upsell_ativo && (
+          <div className="space-y-4">
+            {/* Tempo de espera */}
+            <div className="bg-gray-50 rounded-lg p-4">
+              <label className="block text-xs text-gray-600 mb-2 flex items-center gap-1"><Clock size={12} /> Enviar após</label>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  min="1"
+                  value={configs.upsell_tempo || '30'}
+                  onChange={(e) => setConfigs(prev => ({ ...prev, upsell_tempo: e.target.value }))}
+                  className="w-24 rounded-lg border-gray-300 text-sm"
+                />
+                <select
+                  value={configs.upsell_unidade || 'minutos'}
+                  onChange={(e) => setConfigs(prev => ({ ...prev, upsell_unidade: e.target.value }))}
+                  className="flex-1 rounded-lg border-gray-300 text-sm"
+                >
+                  <option value="minutos">Minutos</option>
+                  <option value="horas">Horas</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Blocos de conteúdo */}
+            {upsellBlocos.length > 0 && (
+              <div className="space-y-3">
+                {upsellBlocos.map((bloco, idx) => (
+                  <div key={idx} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                    <div className="flex items-center gap-2 mb-2">
+                      {bloco.tipo === 'video' ? (
+                        <span className="text-xs font-medium text-purple-600 flex items-center gap-1"><Film size={12} /> Vídeo</span>
+                      ) : (
+                        <span className="text-xs font-medium text-blue-600 flex items-center gap-1"><Type size={12} /> Texto</span>
+                      )}
+                      <button onClick={() => removerBloco(idx)} className="ml-auto text-gray-300 hover:text-red-500">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                    {bloco.tipo === 'video' ? (
+                      <input
+                        type="text"
+                        value={bloco.valor}
+                        onChange={(e) => atualizarBloco(idx, e.target.value)}
+                        className="w-full rounded-lg border-gray-300 text-sm"
+                        placeholder="https://exemplo.com/video.mp4"
+                      />
+                    ) : (
+                      <textarea
+                        value={bloco.valor}
+                        onChange={(e) => atualizarBloco(idx, e.target.value)}
+                        className="w-full rounded-lg border-gray-300 text-sm"
+                        rows={3}
+                        placeholder="Texto da mensagem de upsell..."
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Botões adicionar bloco */}
+            <div className="flex gap-2">
+              <button
+                onClick={() => adicionarBloco('video')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-purple-600 border border-dashed border-purple-300 rounded-lg hover:bg-purple-50 transition-colors"
+              >
+                <Film size={13} /> + Vídeo
+              </button>
+              <button
+                onClick={() => adicionarBloco('texto')}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2 text-xs text-blue-600 border border-dashed border-blue-300 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                <Type size={13} /> + Texto
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       <button
         onClick={salvar}
         disabled={salvando}
         className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
       >
-        <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Configuracoes'}
+        <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Configurações'}
       </button>
     </div>
   );

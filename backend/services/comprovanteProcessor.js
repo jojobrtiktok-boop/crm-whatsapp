@@ -3,7 +3,7 @@ const crypto = require('crypto');
 const { PrismaClient } = require('@prisma/client');
 const { analisarImagem, analisarTextoPDF } = require('./claudeVision');
 const { emitir } = require('./socketManager');
-const { enviarTexto, aplicarEtiqueta } = require('./evolutionApi');
+const { enviarTexto, enviarDocumento, aplicarEtiqueta } = require('./evolutionApi');
 const { detectarPaisDeTelefone, PAISES, MSGS_CONFIRMACAO, MSGS_DIVERGENCIA, formatarMoedaLocal } = require('../utils/paises');
 
 const prisma = new PrismaClient();
@@ -132,9 +132,9 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         data: { status: 'comprou' },
       });
 
-      // Buscar configurações da conta para mensagem personalizada e etiqueta
+      // Buscar configurações da conta para mensagem personalizada, PDF, etiqueta e upsell
       const configsConta = await prisma.configuracao.findMany({
-        where: { chave: { in: ['msg_pagamento_confirmado', 'etiqueta_pagamento_ativa', 'etiqueta_pagamento_id', 'etiqueta_pagamento_instancia'] }, contaId },
+        where: { chave: { in: ['msg_pagamento_confirmado', 'etiqueta_pagamento_ativa', 'etiqueta_pagamento_id', 'confirmacao_pdf_ativo', 'confirmacao_pdf_url', 'upsell_ativo', 'upsell_tempo', 'upsell_unidade', 'upsell_blocos'] }, contaId },
       }).catch(() => []);
       const cfgMap = Object.fromEntries(configsConta.map(c => [c.chave, c.valor]));
 
@@ -162,6 +162,16 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
       }
 
+      // Enviar PDF junto com a confirmação, se configurado
+      if (cfgMap.confirmacao_pdf_ativo === 'true' && cfgMap.confirmacao_pdf_url) {
+        try {
+          await enviarDocumento(instanciaEvolution, telefoneCliente, cfgMap.confirmacao_pdf_url, 'confirmacao.pdf');
+          console.log('[Comprovante] PDF de confirmação enviado');
+        } catch (err) {
+          console.error('[Comprovante] Erro ao enviar PDF:', err.message);
+        }
+      }
+
       // Aplicar etiqueta em todos os chips ativos da conta
       if (cfgMap.etiqueta_pagamento_ativa === 'true' && cfgMap.etiqueta_pagamento_id) {
         const chipsAtivos = await prisma.chip.findMany({ where: { contaId, ativo: true } });
@@ -172,6 +182,26 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
           } catch (err) {
             console.error(`[Comprovante] Erro ao aplicar etiqueta no chip ${c.instanciaEvolution}:`, err.message);
           }
+        }
+      }
+      // Agendar upsell automático com delay, se configurado
+      if (cfgMap.upsell_ativo === 'true' && cfgMap.upsell_blocos) {
+        try {
+          const blocos = JSON.parse(cfgMap.upsell_blocos);
+          const tempoMs = parseInt(cfgMap.upsell_tempo || '30') * (cfgMap.upsell_unidade === 'horas' ? 3600000 : 60000);
+          const { mensagemQueue } = require('../queues/setup');
+          for (let i = 0; i < blocos.length; i++) {
+            const bloco = blocos[i];
+            const delay = tempoMs + (i * 3000);
+            if (bloco.tipo === 'texto' && bloco.valor) {
+              await mensagemQueue.add({ tipo: 'texto', instancia: instanciaEvolution, telefone: telefoneCliente, mensagem: bloco.valor }, { delay });
+            } else if (bloco.tipo === 'video' && bloco.valor) {
+              await mensagemQueue.add({ tipo: 'video', instancia: instanciaEvolution, telefone: telefoneCliente, url: bloco.valor, legenda: '' }, { delay });
+            }
+          }
+          console.log(`[Comprovante] Upsell agendado: ${blocos.length} blocos em ${cfgMap.upsell_tempo} ${cfgMap.upsell_unidade}`);
+        } catch (err) {
+          console.error('[Comprovante] Erro ao agendar upsell:', err.message);
         }
       }
     } else {
