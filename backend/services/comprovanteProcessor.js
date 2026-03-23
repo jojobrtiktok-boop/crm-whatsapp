@@ -168,13 +168,28 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
       }
 
-      // Enviar PDF junto com a confirmação, se configurado
-      if (cfgMap.confirmacao_pdf_ativo === 'true' && cfgMap.confirmacao_pdf_url) {
-        try {
-          await enviarDocumento(instanciaEvolution, telefoneCliente, cfgMap.confirmacao_pdf_url, 'confirmacao.pdf');
-          console.log('[Comprovante] PDF de confirmação enviado');
-        } catch (err) {
-          console.error('[Comprovante] Erro ao enviar PDF:', err.message);
+      // Emitir evento venda:confirmada para push notifications
+      try {
+        const { io } = require('./socketManager');
+        if (io) io.emit('venda:confirmada', { valor: dados.valor, contaId });
+      } catch (_) {}
+
+      // Enviar PDFs junto com a confirmação, se configurado
+      if (cfgMap.confirmacao_pdf_ativo === 'true') {
+        // Suporte a múltiplos PDFs (confirmacao_pdfs) ou único (confirmacao_pdf_url)
+        let listaPdfs = [];
+        if (cfgMap.confirmacao_pdfs) {
+          try { listaPdfs = JSON.parse(cfgMap.confirmacao_pdfs); } catch { listaPdfs = []; }
+        } else if (cfgMap.confirmacao_pdf_url) {
+          listaPdfs = [{ url: cfgMap.confirmacao_pdf_url, nome: 'confirmacao.pdf' }];
+        }
+        for (const pdf of listaPdfs) {
+          try {
+            await enviarDocumento(instanciaEvolution, telefoneCliente, pdf.url, pdf.nome || 'confirmacao.pdf');
+            console.log('[Comprovante] PDF enviado:', pdf.nome || pdf.url);
+          } catch (err) {
+            console.error('[Comprovante] Erro ao enviar PDF:', err.message);
+          }
         }
       }
 

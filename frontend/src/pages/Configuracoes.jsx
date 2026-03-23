@@ -284,6 +284,8 @@ function ConfigPagamento() {
   const [etiquetas, setEtiquetas] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [carregandoEtiquetas, setCarregandoEtiquetas] = useState(false);
+  const [pdfs, setPdfs] = useState([]); // [{url, nome}]
+  const [uploadandoPdf, setUploadandoPdf] = useState(false);
 
   useEffect(() => {
     Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
@@ -295,8 +297,13 @@ function ConfigPagamento() {
         etiqueta_pagamento_ativa: cfg.etiqueta_pagamento_ativa === 'true',
         etiqueta_pagamento_id: cfg.etiqueta_pagamento_id || '',
         confirmacao_pdf_ativo: cfg.confirmacao_pdf_ativo === 'true',
-        confirmacao_pdf_url: cfg.confirmacao_pdf_url || '',
       });
+      // Carregar múltiplos PDFs
+      if (cfg.confirmacao_pdfs) {
+        try { setPdfs(JSON.parse(cfg.confirmacao_pdfs)); } catch { setPdfs([]); }
+      } else if (cfg.confirmacao_pdf_url) {
+        setPdfs([{ url: cfg.confirmacao_pdf_url, nome: 'PDF de confirmação' }]);
+      }
       if (chipsConectados.length > 0) {
         buscarEtiquetas(chipsConectados[0].id);
       }
@@ -315,6 +322,26 @@ function ConfigPagamento() {
     }
   }
 
+  async function uploadPdf(files) {
+    setUploadandoPdf(true);
+    try {
+      const novos = [...pdfs];
+      for (const file of files) {
+        const fd = new FormData();
+        fd.append('arquivo', file);
+        const res = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const base = window.location.origin.replace(':5173', ':3001');
+        novos.push({ url: base + res.data.url, nome: file.name });
+      }
+      setPdfs(novos);
+    } catch { alert('Erro ao fazer upload do PDF'); }
+    finally { setUploadandoPdf(false); }
+  }
+
+  function removerPdf(idx) {
+    setPdfs(prev => prev.filter((_, i) => i !== idx));
+  }
+
   async function salvar() {
     setSalvando(true);
     try {
@@ -323,7 +350,7 @@ function ConfigPagamento() {
         etiqueta_pagamento_ativa: configs.etiqueta_pagamento_ativa ? 'true' : 'false',
         etiqueta_pagamento_id: configs.etiqueta_pagamento_id,
         confirmacao_pdf_ativo: configs.confirmacao_pdf_ativo ? 'true' : 'false',
-        confirmacao_pdf_url: configs.confirmacao_pdf_url,
+        confirmacao_pdfs: JSON.stringify(pdfs),
       });
       alert('Configurações salvas!');
     } catch {
@@ -365,16 +392,39 @@ function ConfigPagamento() {
           </button>
         </div>
         {configs.confirmacao_pdf_ativo && (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <label className="block text-xs text-gray-600 mb-1">URL do PDF</label>
-            <input
-              type="text"
-              value={configs.confirmacao_pdf_url || ''}
-              onChange={(e) => setConfigs(prev => ({ ...prev, confirmacao_pdf_url: e.target.value }))}
-              className="w-full rounded-lg border-gray-300 text-sm"
-              placeholder="https://exemplo.com/recibo.pdf"
-            />
-            <p className="text-[10px] text-gray-400 mt-1">Link público acessível. Será enviado logo após a mensagem de confirmação.</p>
+          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+            {/* Lista de PDFs */}
+            {pdfs.length > 0 && (
+              <div className="space-y-2">
+                {pdfs.map((pdf, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
+                    <FileText size={14} className="text-red-500 shrink-0" />
+                    <span className="text-xs flex-1 truncate">{pdf.nome}</span>
+                    <button onClick={() => removerPdf(i)} className="text-gray-400 hover:text-red-500 shrink-0">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Upload */}
+            <div>
+              <input
+                type="file"
+                id="pdf-pagamento-upload"
+                accept=".pdf"
+                multiple
+                className="hidden"
+                onChange={(e) => { if (e.target.files?.length) { uploadPdf(Array.from(e.target.files)); e.target.value = ''; } }}
+              />
+              <label
+                htmlFor="pdf-pagamento-upload"
+                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-dashed border-red-300 text-red-500 text-sm cursor-pointer hover:bg-red-50 transition-colors"
+              >
+                {uploadandoPdf ? 'Enviando...' : <><Plus size={14} /> Adicionar PDF(s)</>}
+              </label>
+              <p className="text-[10px] text-gray-400 mt-1">Pode adicionar quantos PDFs quiser. Todos serão enviados após a confirmação.</p>
+            </div>
           </div>
         )}
       </div>
@@ -459,6 +509,24 @@ function BlocoInput({ bloco, idx, onChange, onRemove }) {
   const def = TIPOS_BLOCO.find(t => t.tipo === bloco.tipo) || TIPOS_BLOCO[0];
   const cor = COR_MAP[def.cor];
   const Icon = def.icon;
+  const [uploading, setUploading] = useState(false);
+  const fileId = `bloco-${idx}-${bloco.tipo}`;
+
+  const acceptMap = { video: 'video/*', imagem: 'image/*', audio: 'audio/*', pdf: '.pdf' };
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append('arquivo', file);
+      const res = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const base = window.location.origin.replace(':5173', ':3001');
+      onChange(base + res.data.url);
+    } catch { alert('Erro ao fazer upload'); }
+    finally { setUploading(false); e.target.value = ''; }
+  }
 
   return (
     <div style={{ background: cor.bg, border: `1px solid ${cor.border}`, borderRadius: 12, padding: '12px 14px' }}>
@@ -477,15 +545,25 @@ function BlocoInput({ bloco, idx, onChange, onRemove }) {
           className="w-full rounded-lg border-gray-300 text-sm" rows={3}
           placeholder="Texto da mensagem..." />
       )}
-      {(bloco.tipo === 'video' || bloco.tipo === 'imagem' || bloco.tipo === 'audio') && (
-        <input type="text" value={bloco.valor} onChange={e => onChange(e.target.value)}
-          className="w-full rounded-lg border-gray-300 text-sm"
-          placeholder={bloco.tipo === 'video' ? 'https://exemplo.com/video.mp4' : bloco.tipo === 'imagem' ? 'https://exemplo.com/imagem.jpg' : 'https://exemplo.com/audio.ogg'} />
-      )}
-      {bloco.tipo === 'pdf' && (
-        <input type="text" value={bloco.valor} onChange={e => onChange(e.target.value)}
-          className="w-full rounded-lg border-gray-300 text-sm"
-          placeholder="https://exemplo.com/documento.pdf" />
+      {(bloco.tipo === 'video' || bloco.tipo === 'imagem' || bloco.tipo === 'audio' || bloco.tipo === 'pdf') && (
+        <div className="space-y-1.5">
+          <input type="text" value={bloco.valor} onChange={e => onChange(e.target.value)}
+            className="w-full rounded-lg border-gray-300 text-sm"
+            placeholder="URL ou faça upload abaixo" />
+          <div className="flex items-center gap-2">
+            <input type="file" id={fileId} className="hidden"
+              accept={acceptMap[bloco.tipo]}
+              onChange={handleUpload} />
+            <label htmlFor={fileId}
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
+              style={{ border: `1px solid ${cor.border}`, color: cor.text, background: 'white' }}>
+              {uploading ? 'Enviando...' : '↑ Upload do PC'}
+            </label>
+            {bloco.valor && !bloco.valor.startsWith('http') === false && (
+              <span className="text-[10px] text-gray-400 truncate max-w-[120px]">✓ arquivo salvo</span>
+            )}
+          </div>
+        </div>
       )}
       {bloco.tipo === 'delay' && (
         <div className="flex gap-2">

@@ -43,8 +43,38 @@ export default function Sidebar() {
     ]);
   }, []);
 
+  const handleVendaConfirmada = useCallback((data) => {
+    const valor = data.valor != null ? `R$ ${Number(data.valor).toFixed(2).replace('.', ',')}` : '?';
+    const texto = `💰 Acabou de sair uma venda no valor de ${valor}`;
+    setNotificacoes((prev) => [
+      { id: Date.now(), texto, tipo: 'venda' },
+      ...prev.slice(0, 9),
+    ]);
+    if (Notification.permission === 'granted') {
+      new Notification('💰 Nova Venda!', {
+        body: `Acabou de sair uma venda no valor de ${valor}`,
+        icon: 'https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png',
+      });
+    }
+  }, []);
+
   useSocketEvent('atendimento:novo', handleNovoAtendimento);
   useSocketEvent('comprovante:analisado', handleComprovante);
+  useSocketEvent('venda:confirmada', handleVendaConfirmada);
+
+  async function ativarNotificacoes() {
+    setNotificacoes([]);
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      const perm = await Notification.requestPermission();
+      if (perm === 'granted') {
+        new Notification('✅ Notificações ativadas!', {
+          body: 'Você receberá alertas de novas vendas.',
+          icon: 'https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png',
+        });
+      }
+    }
+  }
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 flex-col z-30"
@@ -105,10 +135,10 @@ export default function Sidebar() {
               <button
                 className="relative p-1.5 rounded-lg transition-all"
                 style={{ color: '#475569', border: '1px solid #1a2d4a', background: '#0d1526' }}
-                onClick={() => setNotificacoes([])}
+                onClick={ativarNotificacoes}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa'; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a2d4a'; e.currentTarget.style.color = '#475569'; }}
-                title={notificacoes.length > 0 ? `${notificacoes.length} notificações` : 'Sem notificações'}
+                title={Notification?.permission === 'granted' ? 'Notificações ativas — clique para limpar' : 'Clique para ativar notificações de vendas'}
               >
                 <Bell size={14} />
                 {notificacoes.length > 0 && (

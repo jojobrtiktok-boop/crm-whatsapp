@@ -1,0 +1,22 @@
+{
+  "name": "NexoFlow",
+  "short_name": "NexoFlow",
+  "description": "CRM WhatsApp - Automação e Gestão de Leads",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080f1f",
+  "theme_color": "#080f1f",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
