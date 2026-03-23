@@ -8,8 +8,11 @@ import {
   MessageCircle,
   Settings,
   LogOut,
+  Bell,
 } from 'lucide-react';
+import { useState, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
+import { useSocketEvent } from '../hooks/useSocket';
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -23,6 +26,25 @@ const menuItems = [
 
 export default function Sidebar() {
   const { logout, usuario } = useAuth();
+  const [notificacoes, setNotificacoes] = useState([]);
+
+  const handleNovoAtendimento = useCallback((data) => {
+    setNotificacoes((prev) => [
+      { id: Date.now(), texto: `Novo atendimento: ${data.cliente?.nome || 'Lead'}`, tipo: 'atendimento' },
+      ...prev.slice(0, 9),
+    ]);
+  }, []);
+
+  const handleComprovante = useCallback((data) => {
+    const status = data.status === 'confirmado' ? 'Confirmado' : 'Divergente';
+    setNotificacoes((prev) => [
+      { id: Date.now(), texto: `Comprovante ${status}`, tipo: 'comprovante' },
+      ...prev.slice(0, 9),
+    ]);
+  }, []);
+
+  useSocketEvent('atendimento:novo', handleNovoAtendimento);
+  useSocketEvent('comprovante:analisado', handleComprovante);
 
   return (
     <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 flex-col z-30"
@@ -78,6 +100,25 @@ export default function Sidebar() {
       <div className="px-4 py-4" style={{ borderTop: '1px solid #1a2d4a' }}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
+            {/* Sino de notificações */}
+            <div className="relative">
+              <button
+                className="relative p-1.5 rounded-lg transition-all"
+                style={{ color: '#475569', border: '1px solid #1a2d4a', background: '#0d1526' }}
+                onClick={() => setNotificacoes([])}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = '#3b82f6'; e.currentTarget.style.color = '#60a5fa'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = '#1a2d4a'; e.currentTarget.style.color = '#475569'; }}
+                title={notificacoes.length > 0 ? `${notificacoes.length} notificações` : 'Sem notificações'}
+              >
+                <Bell size={14} />
+                {notificacoes.length > 0 && (
+                  <span className="absolute -top-1 -right-1 text-white text-[8px] w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold"
+                    style={{ background: 'linear-gradient(135deg,#ef4444,#dc2626)' }}>
+                    {notificacoes.length}
+                  </span>
+                )}
+              </button>
+            </div>
             <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
               style={{ background: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' }}>
               {usuario?.nome?.[0]?.toUpperCase() || 'U'}
