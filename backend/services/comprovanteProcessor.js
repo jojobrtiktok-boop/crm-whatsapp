@@ -171,7 +171,9 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       // Emitir evento venda:confirmada para push notifications
       try {
         const { io } = require('./socketManager');
-        if (io) io.emit('venda:confirmada', { valor: dados.valor, contaId });
+        const paisVenda = detectarPaisDeTelefone(telefoneCliente);
+        const valorFormatado = dados.valor ? formatarMoedaLocal(dados.valor, paisVenda) : null;
+        if (io) io.emit('venda:confirmada', { valor: dados.valor, valorFormatado, contaId });
       } catch (_) {}
 
       // Enviar PDFs junto com a confirmação, se configurado

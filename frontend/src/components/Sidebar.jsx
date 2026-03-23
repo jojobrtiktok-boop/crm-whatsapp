@@ -44,7 +44,7 @@ export default function Sidebar() {
   }, []);
 
   const handleVendaConfirmada = useCallback((data) => {
-    const valor = data.valor != null ? `R$ ${Number(data.valor).toFixed(2).replace('.', ',')}` : '?';
+    const valor = data.valorFormatado || (data.valor != null ? `R$ ${Number(data.valor).toFixed(2).replace('.', ',')}` : '?');
     const texto = `💰 Acabou de sair uma venda no valor de ${valor}`;
     setNotificacoes((prev) => [
       { id: Date.now(), texto, tipo: 'venda' },
