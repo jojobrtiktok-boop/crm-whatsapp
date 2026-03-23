@@ -258,36 +258,30 @@ function ConfigFunis() {
 }
 
 function ConfigPagamento() {
-  const [chips, setChips] = useState([]);
   const [configs, setConfigs] = useState({});
+  const [chips, setChips] = useState([]);
   const [etiquetas, setEtiquetas] = useState([]);
-  const [chipEtiqueta, setChipEtiqueta] = useState('');
   const [salvando, setSalvando] = useState(false);
   const [carregandoEtiquetas, setCarregandoEtiquetas] = useState(false);
 
   useEffect(() => {
     Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
-      setChips(resChips.data);
+      const chipsConectados = resChips.data.filter(c => c.statusConexao === 'open' || c.statusConexao === 'connected');
+      setChips(chipsConectados);
       const cfg = resCfg.data;
       setConfigs({
         msg_pagamento_confirmado: cfg.msg_pagamento_confirmado || '',
         etiqueta_pagamento_ativa: cfg.etiqueta_pagamento_ativa === 'true',
         etiqueta_pagamento_id: cfg.etiqueta_pagamento_id || '',
-        etiqueta_pagamento_instancia: cfg.etiqueta_pagamento_instancia || '',
       });
-      // Carregar etiquetas do chip já configurado
-      if (cfg.etiqueta_pagamento_instancia) {
-        const chipEncontrado = resChips.data.find(c => c.instanciaEvolution === cfg.etiqueta_pagamento_instancia);
-        if (chipEncontrado) {
-          setChipEtiqueta(String(chipEncontrado.id));
-          buscarEtiquetas(chipEncontrado.id);
-        }
+      // Carregar etiquetas do primeiro chip conectado
+      if (chipsConectados.length > 0) {
+        buscarEtiquetas(chipsConectados[0].id);
       }
     }).catch(console.error);
   }, []);
 
   async function buscarEtiquetas(chipId) {
-    if (!chipId) { setEtiquetas([]); return; }
     setCarregandoEtiquetas(true);
     try {
       const res = await api.get(`/chips/${chipId}/etiquetas`);
@@ -299,13 +293,6 @@ function ConfigPagamento() {
     }
   }
 
-  function handleChipEtiquetaChange(chipId) {
-    setChipEtiqueta(chipId);
-    const chip = chips.find(c => c.id === parseInt(chipId));
-    setConfigs(prev => ({ ...prev, etiqueta_pagamento_instancia: chip?.instanciaEvolution || '' }));
-    buscarEtiquetas(chipId);
-  }
-
   async function salvar() {
     setSalvando(true);
     try {
@@ -313,7 +300,6 @@ function ConfigPagamento() {
         msg_pagamento_confirmado: configs.msg_pagamento_confirmado,
         etiqueta_pagamento_ativa: configs.etiqueta_pagamento_ativa ? 'true' : 'false',
         etiqueta_pagamento_id: configs.etiqueta_pagamento_id,
-        etiqueta_pagamento_instancia: configs.etiqueta_pagamento_instancia,
       });
       alert('Configuracoes salvas!');
     } catch {
@@ -358,52 +344,33 @@ function ConfigPagamento() {
         </div>
 
         {configs.etiqueta_pagamento_ativa && (
-          <div className="space-y-3 bg-gray-50 rounded-lg p-4">
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Chip para buscar etiquetas</label>
+          <div className="bg-gray-50 rounded-lg p-4">
+            <label className="block text-xs text-gray-600 mb-2">Etiqueta a aplicar (em todos os chips)</label>
+            {carregandoEtiquetas ? (
+              <p className="text-xs text-gray-400">Carregando etiquetas...</p>
+            ) : etiquetas.length > 0 ? (
               <select
-                value={chipEtiqueta}
-                onChange={(e) => handleChipEtiquetaChange(e.target.value)}
+                value={configs.etiqueta_pagamento_id || ''}
+                onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
                 className="w-full rounded-lg border-gray-300 text-sm"
               >
-                <option value="">Selecione um chip</option>
-                {chips.filter(c => c.statusConexao === 'open').map(chip => (
-                  <option key={chip.id} value={chip.id}>{chip.nome} ({chip.numero})</option>
+                <option value="">Selecione uma etiqueta</option>
+                {etiquetas.map(et => (
+                  <option key={et.id} value={et.id}>{et.name || et.id}</option>
                 ))}
               </select>
-              <p className="text-xs text-gray-400 mt-1">Apenas chips conectados. Requer conta WhatsApp Business.</p>
-            </div>
-
-            <div>
-              <label className="block text-xs text-gray-600 mb-1">Etiqueta a aplicar</label>
-              {carregandoEtiquetas ? (
-                <p className="text-xs text-gray-400">Carregando etiquetas...</p>
-              ) : etiquetas.length > 0 ? (
-                <select
+            ) : (
+              <div className="space-y-1">
+                <input
+                  type="text"
                   value={configs.etiqueta_pagamento_id || ''}
                   onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
                   className="w-full rounded-lg border-gray-300 text-sm"
-                >
-                  <option value="">Selecione uma etiqueta</option>
-                  {etiquetas.map(et => (
-                    <option key={et.id} value={et.id}>{et.name || et.id}</option>
-                  ))}
-                </select>
-              ) : (
-                <div className="space-y-2">
-                  <input
-                    type="text"
-                    value={configs.etiqueta_pagamento_id || ''}
-                    onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
-                    className="w-full rounded-lg border-gray-300 text-sm"
-                    placeholder="ID ou nome da etiqueta (ex: 1)"
-                  />
-                  <p className="text-xs text-gray-400">
-                    {chipEtiqueta ? 'Nenhuma etiqueta encontrada. Digite o ID manualmente.' : 'Selecione um chip acima para carregar etiquetas, ou digite o ID manualmente.'}
-                  </p>
-                </div>
-              )}
-            </div>
+                  placeholder="ID ou nome da etiqueta (ex: 1)"
+                />
+                <p className="text-xs text-gray-400">Nenhuma etiqueta encontrada automaticamente. Digite o ID manualmente.</p>
+              </div>
+            )}
           </div>
         )}
       </div>
