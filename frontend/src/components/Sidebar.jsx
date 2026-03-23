@@ -29,11 +29,11 @@ export default function Sidebar() {
       style={{ background: 'linear-gradient(180deg, #080f1f 0%, #060b18 100%)', borderRight: '1px solid #1a2d4a' }}>
 
       {/* Logo */}
-      <div className="flex items-center justify-center px-3 py-4" style={{ borderBottom: '1px solid #1a2d4a' }}>
+      <div className="flex items-center justify-center px-3 py-2" style={{ borderBottom: '1px solid #1a2d4a' }}>
         <img
           src="https://i.postimg.cc/kMSmpLX7/Chat-GPT-Image-23-de-mar-de-2026-12-02-06.png"
           alt="Logo"
-          style={{ height: '90px', width: '100%', maxWidth: '220px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 10px rgba(129,140,248,0.5))' }}
+          style={{ height: '64px', width: '100%', maxWidth: '200px', objectFit: 'contain', filter: 'brightness(1.2) drop-shadow(0 0 10px rgba(129,140,248,0.5))' }}
         />
       </div>
 
