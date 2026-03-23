@@ -196,30 +196,39 @@ async function criarInstancia(nomeSessao) {
 
 // Gerar QR Code
 async function gerarQRCode(sessao) {
-  // Limpar token em cache para forçar token fresco
+  // Forçar token fresco
   delete tokenCache[sessao];
 
-  // Fechar sessão existente para garantir estado limpo (QR novo)
-  try {
-    const token = await getToken(sessao);
-    const closeApi = axios.create({
-      baseURL: BASE_URL,
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      timeout: 10000,
-    });
-    await closeApi.post(`/api/${sessao}/close-session`).catch(() => {});
-    // aguardar WPPConnect processar o fechamento
-    await new Promise((r) => setTimeout(r, 1500));
-  } catch {}
+  const token = await getToken(sessao);
+  if (!token) throw new Error('Falha ao obter token da sessao');
 
-  // Limpar token novamente após fechar e iniciar sessão fresca
-  delete tokenCache[sessao];
-  await criarInstancia(sessao).catch(() => {});
+  const api = axios.create({
+    baseURL: BASE_URL,
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    timeout: 15000,
+  });
 
-  const api = await apiFor(sessao);
-  const response = await api.get(`/api/${sessao}/qrcode-session`);
-  const base64 = response.data?.base64 || response.data?.qrcode || null;
-  return { base64 };
+  // Garantir sessão iniciada (entra em estado QRCODE)
+  await api.post(`/api/${sessao}/start-session`, { webhook: null, waitQrCode: false }).catch(() => {});
+
+  // Aguardar QR ficar disponível (até 5 tentativas × 2s = 10s)
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    await new Promise((r) => setTimeout(r, 2000));
+    try {
+      const response = await api.get(`/api/${sessao}/qrcode-session`);
+      const base64 = response.data?.base64 || response.data?.qrcode || null;
+      if (base64) {
+        console.log(`[QR] ${sessao} obtido na tentativa ${attempt}`);
+        return { base64 };
+      }
+      console.log(`[QR] ${sessao} tentativa ${attempt}: sem base64, status=${JSON.stringify(response.data?.status)}`);
+    } catch (e) {
+      console.log(`[QR] ${sessao} tentativa ${attempt} erro:`, e.response?.status, e.response?.data || e.message);
+    }
+  }
+
+  console.log(`[QR] ${sessao} nao obteve QR em 5 tentativas`);
+  return { base64: null };
 }
 
 // Gerar código de pareamento

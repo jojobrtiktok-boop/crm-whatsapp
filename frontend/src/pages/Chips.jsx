@@ -110,7 +110,7 @@ export default function Chips() {
     setCarregando(true);
     setQrCode(null);
     try {
-      const res = await api.get(`/chips/${modalConexao.chipId}/qrcode`);
+      const res = await api.get(`/chips/${modalConexao.chipId}/qrcode`, { timeout: 60000 });
       if (res.data?.conectado) {
         setConectado(true);
         return;
@@ -395,7 +395,8 @@ export default function Chips() {
                   {carregando ? (
                     <div className="flex flex-col items-center gap-2">
                       <Loader2 size={32} className="text-primary-600 animate-spin" />
-                      <span className="text-sm text-gray-500">Gerando QR Code...</span>
+                      <span className="text-sm text-gray-500">Aguarde, gerando QR Code...</span>
+                      <span className="text-xs text-gray-400">Pode levar até 15 segundos</span>
                     </div>
                   ) : qrCode === 'erro' ? (
                     <div className="flex flex-col items-center gap-2">
