@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, GitBranch, Copy, Trash2, ToggleLeft, ToggleRight, Edit2, Pencil } from 'lucide-react';
+import { Plus, GitBranch, Copy, Trash2, Edit2, Pencil } from 'lucide-react';
 import api from '../api';
 
 export default function Funis() {
@@ -89,8 +89,8 @@ export default function Funis() {
           <div key={funil.id} className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${funil.ativo ? 'bg-green-100' : 'bg-gray-100'}`}>
-                  <GitBranch className={funil.ativo ? 'text-green-600' : 'text-gray-400'} size={20} />
+                <div className="p-2 rounded-lg bg-primary-50">
+                  <GitBranch className="text-primary-600" size={20} />
                 </div>
                 <div className="flex-1 min-w-0">
                   {renomeando?.id === funil.id ? (
@@ -123,9 +123,6 @@ export default function Funis() {
             </div>
 
             <div className="flex items-center gap-2 text-xs text-gray-500 mb-4">
-              <span className={`px-2 py-0.5 rounded-full ${funil.ativo ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                {funil.ativo ? 'Ativo' : 'Inativo'}
-              </span>
               <span>{funil._count?.execucoes || 0} execuções</span>
             </div>
 
@@ -135,13 +132,6 @@ export default function Funis() {
                 className="flex-1 flex items-center justify-center gap-1 py-2 bg-primary-50 text-primary-600 rounded-lg text-xs hover:bg-primary-100"
               >
                 <Edit2 size={12} /> Editar
-              </button>
-              <button
-                onClick={() => toggleFunil(funil.id)}
-                className="p-2 text-gray-400 hover:text-gray-600 bg-gray-50 rounded-lg"
-                title={funil.ativo ? 'Desativar' : 'Ativar'}
-              >
-                {funil.ativo ? <ToggleRight size={16} className="text-green-500" /> : <ToggleLeft size={16} />}
               </button>
               <button
                 onClick={() => duplicarFunil(funil.id)}

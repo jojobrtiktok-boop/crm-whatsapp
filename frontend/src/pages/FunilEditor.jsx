@@ -431,8 +431,8 @@ export default function FunilEditor() {
           fitView
           deleteKeyCode="Delete"
         >
-          <Controls />
-          <Background color="#e2e8f0" gap={20} />
+          <Controls style={{ background: 'rgba(8,15,31,0.9)', border: '1px solid rgba(129,140,248,0.25)', borderRadius: 10 }} />
+          <Background color="#1a2d4a" gap={20} />
           <Panel position="top-right">
             <div className="flex gap-2">
               <span className="bg-white px-3 py-1.5 rounded-lg text-sm font-medium text-gray-700 border shadow-sm">

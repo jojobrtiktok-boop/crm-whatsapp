@@ -151,3 +151,21 @@ option { background: #0d1526; color: #f1f5f9; }
 
 /* ── Table/List alternates ────────────────────────────────── */
 .border-b.border-gray-100:last-child { border: none !important; }
+
+/* ── React Flow: esconder atribuição, escurecer controles ─── */
+.react-flow__attribution { display: none !important; }
+.react-flow__controls-button {
+  background: rgba(13,21,38,0.95) !important;
+  border-color: rgba(129,140,248,0.2) !important;
+  color: #94a3b8 !important;
+}
+.react-flow__controls-button:hover {
+  background: rgba(129,140,248,0.15) !important;
+  border-color: rgba(129,140,248,0.45) !important;
+}
+.react-flow__controls-button svg {
+  fill: #94a3b8 !important;
+}
+.react-flow__controls-button:hover svg {
+  fill: #c4b5fd !important;
+}
