@@ -40,11 +40,11 @@ html, body, #root {
 
 /* ── Borders ──────────────────────────────────────────────── */
 .border-gray-100,
-.border-gray-200    { border-color: var(--border-sub) !important; }
-.border-gray-300    { border-color: var(--border) !important; }
-.border-b           { border-bottom-color: var(--border-sub) !important; }
-.border-t           { border-top-color: var(--border-sub) !important; }
-.divide-y > * + *   { border-top-color: var(--border-sub) !important; }
+.border-gray-200    { border-color: rgba(129,140,248,0.18) !important; }
+.border-gray-300    { border-color: rgba(129,140,248,0.22) !important; }
+.border-b           { border-bottom-color: rgba(129,140,248,0.15) !important; }
+.border-t           { border-top-color: rgba(129,140,248,0.15) !important; }
+.divide-y > * + *   { border-top-color: rgba(129,140,248,0.15) !important; }
 
 /* ── Typography ───────────────────────────────────────────── */
 .text-gray-900,
@@ -128,18 +128,25 @@ option { background: #0d1526; color: #f1f5f9; }
 
 /* ── Glow Card ────────────────────────────────────────────── */
 .card-glow {
-  border: 1px solid var(--border);
+  border: 1px solid rgba(129,140,248,0.25);
   background: var(--bg-card);
-  box-shadow: 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03);
+  box-shadow: 0 0 20px rgba(129,140,248,0.08), 0 4px 24px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03);
   border-radius: 14px;
 }
 
 /* ── Modal Overlay ────────────────────────────────────────── */
 .bg-black\/50 { background: rgba(0,0,0,0.7) !important; }
 
-/* ── Rounded-xl cards glow on hover ──────────────────────── */
+/* ── Rounded-xl cards glow ────────────────────────────────── */
 .rounded-xl {
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+.rounded-xl.border {
+  box-shadow: 0 0 16px rgba(129,140,248,0.08);
+}
+.rounded-xl.border:hover {
+  box-shadow: 0 0 24px rgba(129,140,248,0.18), 0 4px 20px rgba(0,0,0,0.3);
+  border-color: rgba(129,140,248,0.35) !important;
 }
 
 /* ── Table/List alternates ────────────────────────────────── */

@@ -220,7 +220,7 @@ export default function Dashboard() {
 
 function MetricCard({ titulo, valor, sub, icone: Icone, cor, destaque }) {
   return (
-    <div className={`rounded-xl shadow-sm overflow-hidden ${destaque ? 'ring-2 ring-green-400 ring-offset-1' : 'border border-gray-200'}`}>
+    <div className="rounded-xl shadow-sm overflow-hidden border border-gray-200">
       <div className={`bg-gradient-to-br ${cor} p-4 text-white`}>
         <div className="flex items-center justify-between mb-3">
           <p className="text-xs font-medium text-white/80">{titulo}</p>
