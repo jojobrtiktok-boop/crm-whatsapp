@@ -167,6 +167,15 @@ router.put('/:id', async (req, res, next) => {
     if (status === 'confirmado') {
       const io = req.app.get('io');
       if (io) io.emit('venda:confirmada', venda);
+      // Push notification
+      try {
+        const { enviarPushParaTodos } = require('./push');
+        enviarPushParaTodos({
+          title: '💰 Venda Confirmada!',
+          body: `${venda.cliente?.nome || 'Cliente'} — R$ ${Number(venda.valor || 0).toFixed(2).replace('.', ',')}`,
+          tag: 'venda',
+        });
+      } catch (_) {}
     }
 
     res.json(venda);

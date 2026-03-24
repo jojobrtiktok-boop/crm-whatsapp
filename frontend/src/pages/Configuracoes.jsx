@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp, Film, Type, FileText, Image, Mic, Zap, GripVertical } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, Wifi, WifiOff, Globe, ChevronDown, ChevronUp, Film, Type, FileText, Image, Mic, Zap, GripVertical, Bell, QrCode } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { usePushNotifications } from '../hooks/usePushNotifications';
 
 export default function Configuracoes() {
   const [abaAtiva, setAbaAtiva] = useState('funis');
@@ -11,7 +12,8 @@ export default function Configuracoes() {
     { key: 'funis', label: 'Funis Ativos', icon: GitBranch },
     { key: 'upsell', label: 'Upsell', icon: Zap },
     { key: 'pagamento', label: 'Pagamento', icon: CreditCard },
-    { key: 'proxy', label: 'Proxy', icon: Globe },
+    { key: 'pix', label: 'PIX', icon: QrCode },
+    { key: 'notificacoes', label: 'Notificações', icon: Bell },
     { key: 'usuarios', label: 'Usuarios', icon: Shield },
     { key: 'blacklist', label: 'Blacklist', icon: Ban },
   ];
@@ -59,7 +61,8 @@ export default function Configuracoes() {
       {abaAtiva === 'funis' && <ConfigFunis />}
       {abaAtiva === 'upsell' && <ConfigUpsell />}
       {abaAtiva === 'pagamento' && <ConfigPagamento />}
-      {abaAtiva === 'proxy' && <ConfigProxy />}
+      {abaAtiva === 'pix' && <ConfigPix />}
+      {abaAtiva === 'notificacoes' && <ConfigNotificacoes />}
       {abaAtiva === 'usuarios' && <ConfigUsuarios />}
       {abaAtiva === 'blacklist' && <ConfigBlacklist />}
     </div>
@@ -777,6 +780,130 @@ function ConfigUpsell() {
   );
 }
 
+function ConfigPix() {
+  const [chips, setChips] = useState([]);
+  const [pixConfigs, setPixConfigs] = useState([]);
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
+      setChips(resChips.data);
+      if (resCfg.data.pix_configs) {
+        try { setPixConfigs(JSON.parse(resCfg.data.pix_configs)); } catch { setPixConfigs([]); }
+      }
+    }).catch(console.error);
+  }, []);
+
+  function getCfg(chipId) {
+    return pixConfigs.find(p => p.chipId === chipId) || { chipId, tipo: 'cpf', chave: '' };
+  }
+
+  function updateCfg(chipId, campo, valor) {
+    const existe = pixConfigs.find(p => p.chipId === chipId);
+    const novas = existe
+      ? pixConfigs.map(p => p.chipId === chipId ? { ...p, [campo]: valor } : p)
+      : [...pixConfigs, { chipId, tipo: 'cpf', chave: '', [campo]: valor }];
+    setPixConfigs(novas);
+  }
+
+  async function salvar() {
+    setSalvando(true);
+    try {
+      const filtrado = pixConfigs.filter(p => p.chave?.trim());
+      await api.put('/configuracoes', { pix_configs: JSON.stringify(filtrado) });
+      alert('Chaves PIX salvas!');
+    } catch { alert('Erro ao salvar'); }
+    finally { setSalvando(false); }
+  }
+
+  const TIPO_PLACEHOLDER = {
+    cpf: '000.000.000-00',
+    cnpj: '00.000.000/0001-00',
+    telefone: '+5511999999999',
+    email: 'email@exemplo.com',
+    aleatoria: 'chave-uuid-aleatoria',
+  };
+
+  return (
+    <div className="space-y-4 max-w-4xl">
+      <div>
+        <h3 className="font-semibold text-gray-800">Chaves PIX por Chip</h3>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Configure a chave PIX de cada chip. Quando o bloco <strong>PIX</strong> disparar num funil,
+          o sistema envia a chave do chip que está atendendo o lead para ele copiar e pagar.
+        </p>
+      </div>
+
+      {chips.length === 0 && (
+        <p className="text-sm text-gray-400 text-center py-8">Nenhum chip cadastrado.</p>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {chips.map(chip => {
+          const cfg = getCfg(chip.id);
+          const isConectado = chip.statusConexao === 'open' || chip.statusConexao === 'connected';
+          return (
+            <div key={chip.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="flex items-center gap-3 px-4 py-3 bg-gray-50 border-b border-gray-100">
+                <div className={`p-1.5 rounded-lg ${isConectado ? 'bg-green-100' : 'bg-gray-100'}`}>
+                  <Smartphone size={14} className={isConectado ? 'text-green-600' : 'text-gray-400'} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</p>
+                  <p className={`text-[10px] ${isConectado ? 'text-green-500' : 'text-gray-400'}`}>
+                    {isConectado ? 'Conectado' : 'Desconectado'}
+                  </p>
+                </div>
+              </div>
+              <div className="p-4 space-y-3">
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Tipo de Chave</label>
+                  <select
+                    value={cfg.tipo || 'cpf'}
+                    onChange={e => updateCfg(chip.id, 'tipo', e.target.value)}
+                    className="w-full rounded-lg border-gray-300 text-sm"
+                  >
+                    <option value="cpf">CPF</option>
+                    <option value="cnpj">CNPJ</option>
+                    <option value="telefone">Telefone</option>
+                    <option value="email">E-mail</option>
+                    <option value="aleatoria">Chave Aleatória</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">Chave PIX</label>
+                  <input
+                    type="text"
+                    value={cfg.chave || ''}
+                    onChange={e => updateCfg(chip.id, 'chave', e.target.value)}
+                    className="w-full rounded-lg border-gray-300 text-sm"
+                    placeholder={TIPO_PLACEHOLDER[cfg.tipo || 'cpf']}
+                  />
+                </div>
+                {cfg.chave?.trim() && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700 flex items-center gap-1.5">
+                    <QrCode size={12} /> Chave configurada — usada no bloco PIX dos funis
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {chips.length > 0 && (
+        <button
+          onClick={salvar}
+          disabled={salvando}
+          className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+        >
+          <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Chaves PIX'}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function ConfigProxy() {
   const [proxyUrl, setProxyUrl] = useState('');
   const [salvando, setSalvando] = useState(false);
@@ -869,6 +996,68 @@ function ConfigProxy() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function ConfigNotificacoes() {
+  const { supported: suportado, permission: permissao, subscribed: inscrito, loading, subscribe: inscrever, unsubscribe: desinscrever } = usePushNotifications();
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl space-y-5">
+      <div>
+        <h3 className="font-semibold text-gray-800 mb-1">Notificações Push</h3>
+        <p className="text-xs text-gray-500">
+          Receba notificações no celular/computador quando uma venda for confirmada, mesmo com o app fechado.
+        </p>
+      </div>
+
+      {!suportado && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 text-sm text-yellow-800">
+          Seu navegador não suporta notificações push. Use Chrome ou Safari no iOS 16.4+.
+        </div>
+      )}
+
+      {suportado && permissao === 'denied' && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800">
+          Permissão de notificação bloqueada. Vá nas configurações do navegador e permita notificações para este site.
+        </div>
+      )}
+
+      {suportado && permissao !== 'denied' && (
+        <div className="flex items-center justify-between bg-gray-50 rounded-lg p-4">
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${inscrito ? 'bg-green-100' : 'bg-gray-200'}`}>
+              <Bell size={20} className={inscrito ? 'text-green-600' : 'text-gray-500'} />
+            </div>
+            <div>
+              <p className="font-medium text-sm text-gray-800">
+                {inscrito ? 'Notificações ativas' : 'Notificações desativadas'}
+              </p>
+              <p className="text-xs text-gray-500">
+                {inscrito ? 'Você receberá alertas de vendas confirmadas' : 'Ative para receber alertas de vendas'}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={inscrito ? desinscrever : inscrever}
+            disabled={loading}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 ${
+              inscrito
+                ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                : 'bg-primary-600 text-white hover:bg-primary-700'
+            }`}
+          >
+            {loading ? 'Aguarde...' : inscrito ? 'Desativar' : 'Ativar Notificações'}
+          </button>
+        </div>
+      )}
+
+      <div className="text-xs text-gray-400 space-y-1">
+        <p>• Notificações são enviadas quando uma venda é confirmada via comprovante ou manualmente.</p>
+        <p>• Cada dispositivo precisa ativar separadamente.</p>
+        <p>• No iPhone, adicione o site à tela inicial (PWA) antes de ativar.</p>
+      </div>
     </div>
   );
 }

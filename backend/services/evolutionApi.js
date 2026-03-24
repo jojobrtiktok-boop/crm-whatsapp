@@ -159,6 +159,42 @@ async function enviarBotoes(sessao, telefone, titulo, mensagem, botoes) {
   return enviarTexto(sessao, telefone, `${mensagem}\n\n${opcoes}`);
 }
 
+// Mapa: tipo do CRM → keyType WPPConnect (1=phone, 2=CPF, 3=CNPJ, 4=email, 5=random)
+const PIX_KEY_TYPE = { telefone: 1, cpf: 2, cnpj: 3, email: 4, aleatoria: 5 };
+
+// Enviar card PIX nativo do WhatsApp (botão "Copiar chave Pix")
+// Requer WhatsApp Business + conta BR
+async function enviarPix(sessao, telefone, chave, tipo, nomeMerchant = '', cidade = 'Brasil', mensagem = '') {
+  const api = await apiFor(sessao);
+  const keyType = PIX_KEY_TYPE[tipo] || 2;
+  try {
+    // Tenta o endpoint nativo do WPPConnect
+    const response = await api.post(`/api/${sessao}/send-pix`, {
+      phone: formatPhone(telefone),
+      key: chave,
+      keyType,
+      amount: 0,
+      name: nomeMerchant || 'Pagamento',
+      city: cidade,
+    });
+    // Se havia mensagem introdutória, envia antes
+    if (mensagem) {
+      await api.post(`/api/${sessao}/send-message`, {
+        phone: formatPhone(telefone),
+        message: mensagem,
+        isGroup: false,
+      });
+    }
+    return response.data;
+  } catch (err) {
+    // Fallback: envia como texto formatado caso o endpoint não exista na versão
+    const TIPO_LABEL = { telefone: 'Telefone', cpf: 'CPF', cnpj: 'CNPJ', email: 'E-mail', aleatoria: 'Chave Aleatória' };
+    const intro = mensagem ? mensagem + '\n\n' : '';
+    const txt = `${intro}💳 *Pagamento via PIX*\n\nTipo: *${TIPO_LABEL[tipo] || 'Chave'}*\n\n${chave}\n\n_Copie a chave acima e pague pelo app do seu banco_ ✅`;
+    return enviarTexto(sessao, telefone, txt);
+  }
+}
+
 // Verificar status da sessão
 async function verificarStatus(sessao) {
   try {
@@ -329,6 +365,7 @@ module.exports = {
   enviarVideo,
   enviarDocumento,
   enviarBotoes,
+  enviarPix,
   verificarStatus,
   criarInstancia,
   gerarQRCode,

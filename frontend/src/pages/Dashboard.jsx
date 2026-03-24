@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { DollarSign, Users, ShoppingCart, TrendingUp, Smartphone, ArrowUp, BarChart2 } from 'lucide-react';
+
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const handler = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handler);
+    return () => window.removeEventListener('resize', handler);
+  }, []);
+  return isMobile;
+}
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import api from '../api';
 import { useSocketEvent } from '../hooks/useSocket';
@@ -9,6 +19,7 @@ const CORES = ['#22c55e', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 export default function Dashboard() {
   const { formatarMoeda } = useAuth();
+  const isMobile = useIsMobile();
   const [resumo, setResumo] = useState(null);
   const [comparativo, setComparativo] = useState([]);
   const [chipsResumo, setChipsResumo] = useState([]);
@@ -107,11 +118,11 @@ export default function Dashboard() {
             <BarChart2 size={16} className="text-primary-600" /> Vendas por Chip
           </h3>
           {comparativo.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={comparativo} barSize={32}>
+            <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+              <BarChart data={comparativo} barSize={isMobile ? 20 : 32} margin={{ left: isMobile ? 0 : 10 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                <XAxis dataKey="chip" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => formatarMoeda(v)} width={80} />
+                <XAxis dataKey="chip" tick={{ fontSize: isMobile ? 9 : 12 }} interval={0} />
+                <YAxis tick={{ fontSize: isMobile ? 9 : 12 }} tickFormatter={(v) => isMobile ? `R$${v}` : formatarMoeda(v)} width={isMobile ? 48 : 80} />
                 <Tooltip formatter={(value) => formatarMoeda(value)} />
                 <Bar dataKey="valor" fill="#22c55e" radius={[6, 6, 0, 0]}>
                   {comparativo.map((_, i) => (
@@ -183,22 +194,22 @@ export default function Dashboard() {
             <thead>
               <tr className="text-left text-gray-500 border-b border-gray-100">
                 <th className="pb-3 font-medium">Cliente</th>
-                <th className="pb-3 font-medium">Chip</th>
+                <th className="pb-3 font-medium hidden sm:table-cell">Chip</th>
                 <th className="pb-3 font-medium">Valor</th>
                 <th className="pb-3 font-medium">Status</th>
-                <th className="pb-3 font-medium">Data</th>
+                <th className="pb-3 font-medium hidden sm:table-cell">Data</th>
               </tr>
             </thead>
             <tbody>
               {vendasRecentes.map((venda) => (
                 <tr key={venda.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="py-3 font-medium text-gray-800">{venda.cliente?.nome || venda.cliente?.telefone || 'Sem nome'}</td>
-                  <td className="py-3 text-gray-600">{venda.chip?.nome}</td>
-                  <td className="py-3 font-semibold text-green-700">{formatarMoeda(venda.valor)}</td>
+                  <td className="py-3 font-medium text-gray-800 text-xs sm:text-sm">{venda.cliente?.nome || venda.cliente?.telefone || 'Sem nome'}</td>
+                  <td className="py-3 text-gray-600 hidden sm:table-cell">{venda.chip?.nome}</td>
+                  <td className="py-3 font-semibold text-green-700 text-xs sm:text-sm">{formatarMoeda(venda.valor)}</td>
                   <td className="py-3">
                     <StatusBadge status={venda.status} />
                   </td>
-                  <td className="py-3 text-gray-400 text-xs">
+                  <td className="py-3 text-gray-400 text-xs hidden sm:table-cell">
                     {new Date(venda.criadoEm).toLocaleDateString('pt-BR')}
                   </td>
                 </tr>

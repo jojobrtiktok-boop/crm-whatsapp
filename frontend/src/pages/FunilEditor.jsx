@@ -18,7 +18,7 @@ import {
 import '@xyflow/react/dist/style.css';
 import {
   Save, ArrowLeft, MessageSquare, Image, Mic, Video,
-  Clock, GitBranch, Bot, Tag, MessageCircle, Play, Upload, X, FileText,
+  Clock, GitBranch, Bot, Tag, MessageCircle, Play, Upload, X, FileText, QrCode,
 } from 'lucide-react';
 import api from '../api';
 
@@ -34,6 +34,7 @@ const TIPOS_BLOCOS = [
   { type: 'ia', label: 'IA', icon: Bot, cor: '#06b6d4' },
   { type: 'esperar_resposta', label: 'Esperar Resposta', icon: MessageCircle, cor: '#0ea5e9' },
   { type: 'tag', label: 'Tag', icon: Tag, cor: '#f97316' },
+  { type: 'pix', label: 'PIX', icon: QrCode, cor: '#10b981' },
 ];
 
 // Componente de no personalizado
@@ -259,6 +260,7 @@ export default function FunilEditor() {
       case 'ia': return bloco.data?.mensagemBase?.substring(0, 50) || 'Mensagem com IA';
       case 'esperar_resposta': return `Esperar ${bloco.data?.tempoTimeout || 30} ${bloco.data?.unidadeTimeout || 'minutos'}`;
       case 'tag': return 'Marcar tag';
+      case 'pix': return bloco.data?.mensagem?.substring(0, 40) || 'Enviar chave PIX';
       default: return bloco.type;
     }
   }
@@ -829,6 +831,27 @@ export default function FunilEditor() {
                   placeholder="Ex: VIP, Interessado"
                 />
               </div>
+            )}
+
+            {/* PIX */}
+            {blocoSelecionado.data.blocoType === 'pix' && (
+              <>
+                <div className="bg-green-50 border border-green-200 rounded-lg p-2">
+                  <p className="text-xs text-green-700">
+                    Envia a chave PIX do chip automaticamente. Configure as chaves em <strong>Configurações → PIX</strong>.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Mensagem antes da chave (opcional)</label>
+                  <textarea
+                    value={blocoSelecionado.data.mensagem || ''}
+                    onChange={(e) => atualizarBloco('mensagem', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs resize-y min-h-[60px]"
+                    rows={3}
+                    placeholder="Ex: Para finalizar sua compra, faça o pagamento via PIX:"
+                  />
+                </div>
+              </>
             )}
 
             {/* Botao de deletar bloco */}

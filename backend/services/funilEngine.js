@@ -191,6 +191,46 @@ async function executarBloco(execucaoId, bloco, funil) {
       break;
     }
 
+    case 'pix': {
+      // Busca chave PIX configurada para este chip
+      const pixConfigRec = await prisma.configuracao.findFirst({
+        where: { chave: 'pix_configs', contaId: chip.contaId },
+      });
+      let chavePix = '';
+      let tipoPix = 'cpf';
+      if (pixConfigRec?.valor) {
+        try {
+          const cfgs = JSON.parse(pixConfigRec.valor);
+          const cfg = cfgs.find(c => c.chipId === chip.id);
+          if (cfg) { chavePix = cfg.chave; tipoPix = cfg.tipo || 'cpf'; }
+        } catch {}
+      }
+      const intro = bloco.data?.mensagem
+        ? bloco.data.mensagem.replace('{nome}', cliente.nome || 'amigo')
+        : '';
+      if (chavePix) {
+        // Envia card PIX nativo (botão "Copiar chave Pix") via WPPConnect
+        // Se o chip não for Business/BR, cai automaticamente no fallback de texto
+        const evolutionApi = require('./evolutionApi');
+        await evolutionApi.enviarPix(
+          chip.instanciaEvolution,
+          cliente.telefone,
+          chavePix,
+          tipoPix,
+          chip.nome || '',
+          'Brasil',
+          intro,
+        );
+        // Registra na conversa como texto para histórico
+        await criarConversa(cliente.id, chip.id, intro || 'PIX enviado', 'texto', null, chip.contaId);
+      } else {
+        const msg = intro || 'Entre em contato para receber os dados de pagamento via PIX.';
+        await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId, cliente.id, chip.id, chip.contaId);
+      }
+      await avancarParaProximoBloco(execucaoId, bloco.id, funil);
+      break;
+    }
+
     case 'comprovante': {
       // Aguarda envio de imagem - processado no webhook
       const msg = bloco.data.mensagem || 'Envie o comprovante de pagamento para confirmarmos.';

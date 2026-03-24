@@ -174,6 +174,13 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         const paisVenda = detectarPaisDeTelefone(telefoneCliente);
         const valorFormatado = dados.valor ? formatarMoedaLocal(dados.valor, paisVenda) : null;
         if (io) io.emit('venda:confirmada', { valor: dados.valor, valorFormatado, contaId });
+        // Push notification
+        const { enviarPushParaTodos } = require('../routes/push');
+        enviarPushParaTodos({
+          title: '💰 Venda Confirmada!',
+          body: `Comprovante aprovado — ${valorFormatado || `R$ ${dados.valor}`}`,
+          tag: 'venda',
+        });
       } catch (_) {}
 
       // Enviar PDFs junto com a confirmação, se configurado
