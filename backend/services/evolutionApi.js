@@ -143,10 +143,19 @@ async function enviarVideo(sessao, telefone, videoUrl, legenda = '') {
 // Enviar documento/PDF
 async function enviarDocumento(sessao, telefone, docUrl, nomeArquivo = 'documento.pdf') {
   const api = await apiFor(sessao);
-  const isLocal = docUrl && !docUrl.startsWith('http');
+  let base64Data;
+  if (!docUrl.startsWith('http')) {
+    // Arquivo local — converte direto
+    base64Data = toDataUri(docUrl);
+  } else {
+    // URL remota — baixa e converte para base64
+    const resp = await axios.get(docUrl, { responseType: 'arraybuffer' });
+    const mimeType = resp.headers['content-type'] || 'application/pdf';
+    base64Data = `data:${mimeType};base64,${Buffer.from(resp.data).toString('base64')}`;
+  }
   const response = await api.post(`/api/${sessao}/send-file-base64`, {
     phone: formatPhone(telefone),
-    base64: isLocal ? toDataUri(docUrl) : docUrl,
+    base64: base64Data,
     filename: nomeArquivo || path.basename(docUrl),
     caption: '',
   });
