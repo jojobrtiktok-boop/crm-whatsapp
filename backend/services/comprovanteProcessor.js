@@ -179,11 +179,14 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       if (configsAplicaveis.length > 0) {
         // Novo formato: múltiplas configs por chip
         for (const cfg of configsAplicaveis) {
-          // Chip a usar: o configurado ou o que recebeu o comprovante
-          const chipAtivo = await prisma.chip.findFirst({
-            where: cfg.chipId ? { id: parseInt(cfg.chipId), contaId } : { id: chipId, contaId },
-          }).catch(() => null);
-          const instancia = chipAtivo?.instanciaEvolution || instanciaEvolution;
+          // Chips a usar: lista selecionada ou o chip que recebeu o comprovante
+          const chipIdsAlvo = cfg.chipIds?.length > 0 ? cfg.chipIds : [chipId?.toString()];
+          const chipsAlvo = await prisma.chip.findMany({
+            where: { id: { in: chipIdsAlvo.map(id => parseInt(id)) }, contaId },
+          }).catch(() => []);
+          const instancias = chipsAlvo.length > 0 ? chipsAlvo.map(c => c.instanciaEvolution) : [instanciaEvolution];
+
+          for (const instancia of instancias) {
 
           // Mensagem de confirmação
           if (cfg.msg) {
@@ -216,6 +219,7 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
               }
             }
           }
+          } // fim for instancias
         }
       } else {
         // Fallback: formato legado

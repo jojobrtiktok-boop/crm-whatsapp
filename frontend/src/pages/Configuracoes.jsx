@@ -388,17 +388,41 @@ function ConfigPagamento() {
             )}
           </div>
 
-          {/* Chip */}
+          {/* Chips */}
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">Chip que envia a confirmação</label>
-            <select
-              value={cfg.chipId || ''}
-              onChange={(e) => atualizarConfig(idx, 'chipId', e.target.value)}
-              className="w-full rounded-lg border-gray-300 text-sm"
-            >
-              <option value="">Todos os chips (mesmo que recebeu)</option>
-              {chips.map(c => <option key={c.id} value={c.id}>{c.nome || c.instanciaEvolution}</option>)}
-            </select>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Chips que enviam a confirmação</label>
+            <div className="space-y-1.5">
+              {/* Opção "Todos" */}
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={!cfg.chipIds?.length}
+                  onChange={() => atualizarConfig(idx, 'chipIds', [])}
+                  className="rounded border-gray-300 text-primary-600"
+                />
+                <span className="text-xs text-gray-700">Todos os chips (mesmo que recebeu)</span>
+              </label>
+              {chips.map(c => {
+                const selecionado = cfg.chipIds?.includes(String(c.id));
+                return (
+                  <label key={c.id} className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={selecionado}
+                      onChange={() => {
+                        const atual = cfg.chipIds || [];
+                        const novo = selecionado
+                          ? atual.filter(id => id !== String(c.id))
+                          : [...atual, String(c.id)];
+                        atualizarConfig(idx, 'chipIds', novo);
+                      }}
+                      className="rounded border-gray-300 text-primary-600"
+                    />
+                    <span className="text-xs text-gray-700">{c.nome || c.instanciaEvolution}</span>
+                  </label>
+                );
+              })}
+            </div>
           </div>
 
           {/* Mensagem */}
