@@ -222,9 +222,9 @@ export default function Atendimento() {
   }
 
   return (
-    <div className="h-[calc(100vh-7rem)] md:h-[calc(100vh-7rem)] flex bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Lista de leads — mobile: oculta quando vistaChat está ativo */}
-      <div className={`${vistaChat ? 'hidden' : 'flex'} md:flex w-full md:w-96 border-r border-gray-200 flex-col`}>
+    <div className="flex h-[calc(100vh-7rem)] bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* Lista de leads — mobile: sempre visível (chat abre em overlay) */}
+      <div className="flex w-full md:w-96 border-r border-gray-200 flex-col md:flex-shrink-0">
         <div className="p-3 border-b border-gray-200">
           <div className="flex rounded-lg overflow-hidden border border-gray-200">
             <button
@@ -315,145 +315,28 @@ export default function Atendimento() {
         </div>
       </div>
 
-      {/* Chat — mobile: só aparece quando vistaChat está ativo */}
+      {/* Chat — desktop only (mobile usa overlay abaixo) */}
       {selecionado ? (
-        <div className={`${vistaChat ? 'flex' : 'hidden'} md:flex flex-1 flex-col`}>
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
-            <div className="flex items-center gap-3">
-              {/* Botão voltar (mobile only) */}
-              <button
-                onClick={() => setVistaChat(false)}
-                className="md:hidden p-1 -ml-1 text-gray-500 hover:text-gray-700"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
-              </button>
-              <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center shrink-0">
-                {fotos[selecionado.id]
-                  ? <img src={fotos[selecionado.id]} alt="" className="w-full h-full object-cover" />
-                  : <User size={16} className="text-gray-500" />
-                }
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800">{selecionado.nome || 'Sem nome'}</h3>
-                <div className="flex items-center gap-2">
-                  <p className="text-xs text-gray-500">{selecionado.telefone}</p>
-                  {selecionado.chipOrigem && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md">
-                      <Smartphone size={10} />
-                      {selecionado.chipOrigem.nome || selecionado.chipOrigem.numero?.slice(-4)}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => setModalFunil(true)}
-              className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 px-3 py-1.5 bg-primary-50 rounded-lg"
-            >
-              <GitBranch size={14} /> Ativar Funil
-            </button>
-          </div>
-
-          {/* Mensagens */}
-          <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
-            {conversas.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.tipo === 'enviada' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[70%] px-3 py-2 rounded-lg text-sm ${
-                    msg.tipo === 'enviada'
-                      ? 'bg-primary-500 text-white'
-                      : 'bg-white border border-gray-200 text-gray-800'
-                  }`}
-                >
-                  <MidiaBubble msg={msg} />
-                  <div className={`flex items-center justify-end gap-1 mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
-                    <span className="text-xs">{formatarHora(msg.criadoEm)}</span>
-                    {msg.tipo === 'recebida' && msg.chipId && (
-                      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 text-[9px] font-semibold rounded">
-                        <Smartphone size={8} />
-                        {getNomeChip(msg.chipId)}
-                      </span>
-                    )}
-                    {msg.tipo === 'enviada' && <Ticks status={msg.status} />}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {/* Preview de arquivo para enviar */}
-          {previewArquivo && (
-            <div className="px-4 py-2 border-t border-gray-100 bg-white flex items-center gap-3">
-              {previewArquivo.tipo === 'imagem' && (
-                <img src={previewArquivo.url} alt="" className="h-16 w-16 object-cover rounded" />
-              )}
-              {previewArquivo.tipo === 'video' && (
-                <video src={previewArquivo.url} className="h-16 w-16 object-cover rounded" />
-              )}
-              {previewArquivo.tipo === 'documento' && (
-                <div className="flex items-center gap-2 text-gray-700">
-                  <FileText size={32} />
-                  <span className="text-sm truncate max-w-[200px]">{previewArquivo.file.name}</span>
-                </div>
-              )}
-              <div className="flex-1" />
-              <button
-                onClick={enviarArquivo}
-                disabled={enviando}
-                className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-              >
-                {enviando ? 'Enviando...' : 'Enviar'}
-              </button>
-              <button
-                onClick={() => { setPreviewArquivo(null); fileInputRef.current.value = ''; }}
-                className="p-2 text-gray-400 hover:text-gray-600"
-              >
-                <X size={18} />
-              </button>
-            </div>
-          )}
-
-          {/* Input */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex gap-2 items-center">
-              {/* Botão de anexo */}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*,video/mp4,video/avi,video/mov,.pdf"
-                className="hidden"
-                onChange={onArquivoSelecionado}
-              />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
-                title="Enviar arquivo (imagem, vídeo, PDF)"
-              >
-                <Paperclip size={20} />
-              </button>
-
-              <input
-                type="text"
-                value={mensagem}
-                onChange={(e) => setMensagem(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && enviarMensagem()}
-                className="flex-1 rounded-lg border-gray-300 text-sm"
-                placeholder="Digite sua mensagem..."
-                disabled={enviando}
-              />
-              <button
-                onClick={enviarMensagem}
-                disabled={!mensagem.trim() || enviando}
-                className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50"
-              >
-                <Send size={18} />
-              </button>
-            </div>
-          </div>
+        <div className="hidden md:flex flex-1 flex-col">
+          <ChatHeader
+            lead={selecionado}
+            fotos={fotos}
+            onVoltar={() => setVistaChat(false)}
+            onAtivarFunil={() => setModalFunil(true)}
+            mobile={false}
+          />
+          <ChatMensagens conversas={conversas} chatRef={chatRef} formatarHora={formatarHora} getNomeChip={getNomeChip} />
+          <ChatInput
+            mensagem={mensagem}
+            setMensagem={setMensagem}
+            enviando={enviando}
+            enviarMensagem={enviarMensagem}
+            previewArquivo={previewArquivo}
+            setPreviewArquivo={setPreviewArquivo}
+            enviarArquivo={enviarArquivo}
+            fileInputRef={fileInputRef}
+            onArquivoSelecionado={onArquivoSelecionado}
+          />
         </div>
       ) : (
         <div className="hidden md:flex flex-1 items-center justify-center text-gray-400">
@@ -461,6 +344,31 @@ export default function Atendimento() {
             <User size={48} className="mx-auto mb-3 opacity-50" />
             <p>Selecione uma conversa</p>
           </div>
+        </div>
+      )}
+
+      {/* Overlay full-screen chat — mobile only */}
+      {vistaChat && selecionado && (
+        <div className="fixed inset-0 z-50 flex flex-col bg-white md:hidden">
+          <ChatHeader
+            lead={selecionado}
+            fotos={fotos}
+            onVoltar={() => setVistaChat(false)}
+            onAtivarFunil={() => setModalFunil(true)}
+            mobile={true}
+          />
+          <ChatMensagens conversas={conversas} chatRef={chatRef} formatarHora={formatarHora} getNomeChip={getNomeChip} />
+          <ChatInput
+            mensagem={mensagem}
+            setMensagem={setMensagem}
+            enviando={enviando}
+            enviarMensagem={enviarMensagem}
+            previewArquivo={previewArquivo}
+            setPreviewArquivo={setPreviewArquivo}
+            enviarArquivo={enviarArquivo}
+            fileInputRef={fileInputRef}
+            onArquivoSelecionado={onArquivoSelecionado}
+          />
         </div>
       )}
 
@@ -473,6 +381,142 @@ export default function Atendimento() {
           onClose={() => setModalFunil(false)}
         />
       )}
+    </div>
+  );
+}
+
+function ChatHeader({ lead, fotos, onVoltar, onAtivarFunil, mobile }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200 bg-white shrink-0">
+      <div className="flex items-center gap-3 min-w-0">
+        {mobile && (
+          <button onClick={onVoltar} className="p-1 -ml-1 text-gray-500 hover:text-gray-700 shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          </button>
+        )}
+        <div className="w-9 h-9 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center shrink-0">
+          {fotos[lead.id]
+            ? <img src={fotos[lead.id]} alt="" className="w-full h-full object-cover" />
+            : <User size={16} className="text-gray-500" />
+          }
+        </div>
+        <div className="min-w-0">
+          <h3 className="font-semibold text-gray-800 truncate">{lead.nome || 'Sem nome'}</h3>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-gray-500 truncate">{lead.telefone}</p>
+            {lead.chipOrigem && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md shrink-0">
+                <Smartphone size={10} />
+                {lead.chipOrigem.nome || lead.chipOrigem.numero?.slice(-4)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+      <button
+        onClick={onAtivarFunil}
+        className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 px-3 py-1.5 bg-primary-50 rounded-lg shrink-0 ml-2"
+      >
+        <GitBranch size={14} /> <span className="hidden sm:inline">Ativar Funil</span>
+      </button>
+    </div>
+  );
+}
+
+function ChatMensagens({ conversas, chatRef, formatarHora, getNomeChip }) {
+  return (
+    <div ref={chatRef} className="flex-1 overflow-y-auto p-4 space-y-2 bg-gray-50">
+      {conversas.map((msg) => (
+        <div key={msg.id} className={`flex ${msg.tipo === 'enviada' ? 'justify-end' : 'justify-start'}`}>
+          <div
+            className={`max-w-[75%] px-3 py-2 rounded-lg text-sm ${
+              msg.tipo === 'enviada'
+                ? 'bg-primary-500 text-white'
+                : 'bg-white border border-gray-200 text-gray-800'
+            }`}
+          >
+            <MidiaBubble msg={msg} />
+            <div className={`flex items-center justify-end gap-1 mt-1 ${msg.tipo === 'enviada' ? 'text-primary-100' : 'text-gray-400'}`}>
+              <span className="text-xs">{formatarHora(msg.criadoEm)}</span>
+              {msg.tipo === 'recebida' && msg.chipId && (
+                <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-green-100 text-green-700 text-[9px] font-semibold rounded">
+                  <Smartphone size={8} />
+                  {getNomeChip(msg.chipId)}
+                </span>
+              )}
+              {msg.tipo === 'enviada' && <Ticks status={msg.status} />}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ChatInput({ mensagem, setMensagem, enviando, enviarMensagem, previewArquivo, setPreviewArquivo, enviarArquivo, fileInputRef, onArquivoSelecionado }) {
+  return (
+    <div className="shrink-0 border-t border-gray-200 bg-white">
+      {previewArquivo && (
+        <div className="px-4 py-2 border-b border-gray-100 flex items-center gap-3">
+          {previewArquivo.tipo === 'imagem' && (
+            <img src={previewArquivo.url} alt="" className="h-16 w-16 object-cover rounded" />
+          )}
+          {previewArquivo.tipo === 'video' && (
+            <video src={previewArquivo.url} className="h-16 w-16 object-cover rounded" />
+          )}
+          {previewArquivo.tipo === 'documento' && (
+            <div className="flex items-center gap-2 text-gray-700">
+              <FileText size={32} />
+              <span className="text-sm truncate max-w-[160px]">{previewArquivo.file.name}</span>
+            </div>
+          )}
+          <div className="flex-1" />
+          <button
+            onClick={enviarArquivo}
+            disabled={enviando}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+          >
+            {enviando ? 'Enviando...' : 'Enviar'}
+          </button>
+          <button
+            onClick={() => { setPreviewArquivo(null); fileInputRef.current.value = ''; }}
+            className="p-2 text-gray-400 hover:text-gray-600"
+          >
+            <X size={18} />
+          </button>
+        </div>
+      )}
+      <div className="p-3 flex gap-2 items-center">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*,video/mp4,video/avi,video/mov,.pdf"
+          className="hidden"
+          onChange={onArquivoSelecionado}
+        />
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 shrink-0"
+        >
+          <Paperclip size={20} />
+        </button>
+        <input
+          type="text"
+          value={mensagem}
+          onChange={(e) => setMensagem(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && enviarMensagem()}
+          className="flex-1 rounded-lg border-gray-300 text-sm"
+          placeholder="Digite sua mensagem..."
+          disabled={enviando}
+        />
+        <button
+          onClick={enviarMensagem}
+          disabled={!mensagem.trim() || enviando}
+          className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 disabled:opacity-50 shrink-0"
+        >
+          <Send size={18} />
+        </button>
+      </div>
     </div>
   );
 }
