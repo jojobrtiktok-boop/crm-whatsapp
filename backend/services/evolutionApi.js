@@ -145,12 +145,14 @@ async function enviarDocumento(sessao, telefone, docUrl, nomeArquivo = 'document
   const api = await apiFor(sessao);
   let base64Data;
   if (!docUrl.startsWith('http')) {
-    // Arquivo local — converte direto
     base64Data = toDataUri(docUrl);
+    console.log(`[enviarDocumento] Arquivo local: ${docUrl}`);
   } else {
-    // URL remota — baixa e converte para base64
+    console.log(`[enviarDocumento] Baixando URL: ${docUrl}`);
     const resp = await axios.get(docUrl, { responseType: 'arraybuffer' });
     const mimeType = resp.headers['content-type'] || 'application/pdf';
+    const tamanhoKb = Math.round(resp.data.byteLength / 1024);
+    console.log(`[enviarDocumento] Baixado: ${tamanhoKb}KB mime=${mimeType}`);
     base64Data = `data:${mimeType};base64,${Buffer.from(resp.data).toString('base64')}`;
   }
   const response = await api.post(`/api/${sessao}/send-file-base64`, {
@@ -159,6 +161,7 @@ async function enviarDocumento(sessao, telefone, docUrl, nomeArquivo = 'document
     filename: nomeArquivo || path.basename(docUrl),
     caption: '',
   });
+  console.log(`[enviarDocumento] Resposta baileys: ${JSON.stringify(response.data)}`);
   return response.data;
 }
 
