@@ -177,8 +177,8 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         // Push notification
         const { enviarPushParaTodos } = require('../routes/push');
         enviarPushParaTodos({
-          title: '💰 Venda Confirmada!',
-          body: `Comprovante aprovado — ${valorFormatado || `R$ ${dados.valor}`}`,
+          title: `💰 ${valorFormatado || `R$ ${dados.valor}`} — Venda Confirmada!`,
+          body: 'Comprovante aprovado',
           tag: 'venda',
         });
       } catch (_) {}

@@ -50,8 +50,8 @@ export default function Sidebar() {
       { id: Date.now(), texto, tipo: 'venda' },
       ...prev.slice(0, 9),
     ]);
-    if (Notification.permission === 'granted') {
-      new Notification('💰 Nova Venda!', {
+    if (typeof window.Notification !== 'undefined' && window.Notification.permission === 'granted') {
+      new window.Notification('💰 Nova Venda!', {
         body: `Acabou de sair uma venda no valor de ${valor}`,
         icon: 'https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png',
       });
@@ -64,11 +64,11 @@ export default function Sidebar() {
 
   async function ativarNotificacoes() {
     setNotificacoes([]);
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-      const perm = await Notification.requestPermission();
+    if (typeof window.Notification === 'undefined') return;
+    if (window.Notification.permission === 'default') {
+      const perm = await window.Notification.requestPermission();
       if (perm === 'granted') {
-        new Notification('✅ Notificações ativadas!', {
+        new window.Notification('✅ Notificações ativadas!', {
           body: 'Você receberá alertas de novas vendas.',
           icon: 'https://i.postimg.cc/rwCggDFM/23-de-mar-de-2026-16-12-56.png',
         });
@@ -140,7 +140,7 @@ export default function Sidebar() {
                 onClick={ativarNotificacoes}
                 onMouseEnter={e => { e.currentTarget.style.boxShadow = '0 0 20px rgba(129,140,248,0.6)'; e.currentTarget.style.borderColor = 'rgba(129,140,248,0.7)'; }}
                 onMouseLeave={e => { e.currentTarget.style.boxShadow = '0 0 12px rgba(129,140,248,0.3)'; e.currentTarget.style.borderColor = 'rgba(129,140,248,0.45)'; }}
-                title={Notification?.permission === 'granted' ? 'Notificações ativas — clique para limpar' : 'Clique para ativar notificações de vendas'}
+                title={window.Notification?.permission === 'granted' ? 'Notificações ativas — clique para limpar' : 'Clique para ativar notificações de vendas'}
               >
                 <Bell size={14} />
                 {notificacoes.length > 0 && (

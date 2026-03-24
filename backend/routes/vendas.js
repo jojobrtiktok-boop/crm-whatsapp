@@ -171,8 +171,8 @@ router.put('/:id', async (req, res, next) => {
       try {
         const { enviarPushParaTodos } = require('./push');
         enviarPushParaTodos({
-          title: '💰 Venda Confirmada!',
-          body: `${venda.cliente?.nome || 'Cliente'} — R$ ${Number(venda.valor || 0).toFixed(2).replace('.', ',')}`,
+          title: `💰 R$ ${Number(venda.valor || 0).toFixed(2).replace('.', ',')} — Venda Confirmada!`,
+          body: venda.cliente?.nome || 'Venda confirmada',
           tag: 'venda',
         });
       } catch (_) {}
