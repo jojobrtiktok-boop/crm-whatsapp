@@ -784,6 +784,7 @@ function ConfigPix() {
   const [chips, setChips] = useState([]);
   const [pixConfigs, setPixConfigs] = useState([]);
   const [salvando, setSalvando] = useState(false);
+  const [registrando, setRegistrando] = useState({}); // { chipId: 'loading' | 'ok' | 'erro' | msg }
 
   useEffect(() => {
     Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
@@ -814,6 +815,19 @@ function ConfigPix() {
       alert('Chaves PIX salvas!');
     } catch { alert('Erro ao salvar'); }
     finally { setSalvando(false); }
+  }
+
+  async function registrarNoWhatsApp(chip) {
+    const cfg = getCfg(chip.id);
+    if (!cfg.chave?.trim()) return alert('Preencha a chave PIX primeiro e salve.');
+    setRegistrando(prev => ({ ...prev, [chip.id]: 'loading' }));
+    try {
+      await api.post(`/chips/${chip.id}/registrar-pix`, { chave: cfg.chave, tipo: cfg.tipo });
+      setRegistrando(prev => ({ ...prev, [chip.id]: 'ok' }));
+    } catch (err) {
+      const msg = err.response?.data?.erro || 'Endpoint não suportado nesta versão do WPPConnect';
+      setRegistrando(prev => ({ ...prev, [chip.id]: msg }));
+    }
   }
 
   const TIPO_PLACEHOLDER = {
@@ -881,8 +895,27 @@ function ConfigPix() {
                   />
                 </div>
                 {cfg.chave?.trim() && (
-                  <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700 flex items-center gap-1.5">
-                    <QrCode size={12} /> Chave configurada — usada no bloco PIX dos funis
+                  <div className="space-y-2">
+                    <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700 flex items-center gap-1.5">
+                      <QrCode size={12} /> Chave configurada — usada no bloco PIX dos funis
+                    </div>
+                    {/* Botão registrar no WA Business */}
+                    <button
+                      onClick={() => registrarNoWhatsApp(chip)}
+                      disabled={registrando[chip.id] === 'loading' || !isConectado}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium border border-dashed border-green-400 text-green-700 hover:bg-green-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {registrando[chip.id] === 'loading' ? 'Registrando...' : '📲 Registrar chave no WhatsApp Business'}
+                    </button>
+                    {registrando[chip.id] === 'ok' && (
+                      <p className="text-xs text-green-600 text-center">✅ Chave registrada com sucesso no WhatsApp!</p>
+                    )}
+                    {registrando[chip.id] && registrando[chip.id] !== 'loading' && registrando[chip.id] !== 'ok' && (
+                      <p className="text-xs text-red-500 text-center">⚠️ {registrando[chip.id]}</p>
+                    )}
+                    {!isConectado && (
+                      <p className="text-[10px] text-gray-400 text-center">Conecte o chip para registrar</p>
+                    )}
                   </div>
                 )}
               </div>

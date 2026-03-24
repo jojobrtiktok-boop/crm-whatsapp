@@ -353,4 +353,24 @@ router.get('/:id/etiquetas', async (req, res, next) => {
   }
 });
 
+// POST /api/chips/:id/registrar-pix - Registra chave PIX no WhatsApp Business do chip
+router.post('/:id/registrar-pix', async (req, res, next) => {
+  try {
+    const chip = await prisma.chip.findFirst({
+      where: { id: parseInt(req.params.id), contaId: req.usuario.contaId },
+    });
+    if (!chip) return res.status(404).json({ erro: 'Chip nao encontrado' });
+
+    const { chave, tipo } = req.body;
+    if (!chave || !tipo) return res.status(400).json({ erro: 'Chave e tipo são obrigatórios' });
+
+    const resultado = await evolutionApi.registrarChavePix(chip.instanciaEvolution, chave, tipo);
+    res.json({ ok: true, resultado });
+  } catch (err) {
+    const status = err.response?.status || 500;
+    const msg = err.response?.data?.message || err.response?.data?.error || err.message || 'Erro ao registrar chave PIX';
+    res.status(status).json({ ok: false, erro: msg });
+  }
+});
+
 module.exports = router;

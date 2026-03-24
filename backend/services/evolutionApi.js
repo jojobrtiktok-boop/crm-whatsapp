@@ -195,6 +195,20 @@ async function enviarPix(sessao, telefone, chave, tipo, nomeMerchant = '', cidad
   }
 }
 
+// Registrar chave PIX no WhatsApp Business (Pagamentos → Adicionar chave Pix)
+// Requer WPPConnect com suporte a Business Payment API
+async function registrarChavePix(sessao, chave, tipo) {
+  const api = await apiFor(sessao);
+  const keyType = PIX_KEY_TYPE[tipo] || 2;
+
+  // WPPConnect expõe o método addPixKey do wa-js
+  const response = await api.post(`/api/${sessao}/add-pix-key`, {
+    key: chave,
+    keyType,
+  });
+  return response.data;
+}
+
 // Verificar status da sessão
 async function verificarStatus(sessao) {
   try {
@@ -366,6 +380,7 @@ module.exports = {
   enviarDocumento,
   enviarBotoes,
   enviarPix,
+  registrarChavePix,
   verificarStatus,
   criarInstancia,
   gerarQRCode,
