@@ -62,15 +62,15 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Visão geral do seu negócio</p>
+      <div className="flex items-center justify-between gap-2 min-w-0">
+        <div className="min-w-0">
+          <h1 className="text-xl md:text-2xl font-bold text-gray-800 truncate">Dashboard</h1>
+          <p className="text-xs md:text-sm text-gray-500 mt-0.5">Visão geral do seu negócio</p>
         </div>
         <select
           value={periodo}
           onChange={(e) => setPeriodo(e.target.value)}
-          className="rounded-lg border-gray-300 text-sm shadow-sm"
+          className="rounded-lg border-gray-300 text-xs md:text-sm shadow-sm shrink-0"
         >
           <option value="dia">Hoje</option>
           <option value="semana">Esta Semana</option>
@@ -79,7 +79,7 @@ export default function Dashboard() {
       </div>
 
       {/* Cards de métricas principais */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4">
         <MetricCard
           titulo="Faturamento Hoje"
           valor={formatarMoeda(resumo?.dia?.valor)}
