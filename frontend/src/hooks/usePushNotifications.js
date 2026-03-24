@@ -17,9 +17,9 @@ export function usePushNotifications() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const ok = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const ok = 'serviceWorker' in navigator && 'PushManager' in window && typeof window.Notification !== 'undefined';
     setSupported(ok);
-    if (ok) setPermission(Notification.permission);
+    if (ok) setPermission(window.Notification.permission);
     // Verificar se já está inscrito
     if (ok) {
       navigator.serviceWorker.getRegistration('/sw.js').then(async (reg) => {
