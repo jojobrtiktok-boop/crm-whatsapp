@@ -7,18 +7,28 @@ export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [carregando, setCarregando] = useState(true);
 
+  // Helpers seguros para localStorage (Safari modo privado lança SecurityError)
+  function lsGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+  function lsSet(key, value) {
+    try { localStorage.setItem(key, value); } catch {}
+  }
+  function lsRemove(key) {
+    try { localStorage.removeItem(key); } catch {}
+  }
+
   useEffect(() => {
-    const token = localStorage.getItem('crm_token');
-    const dadosUsuario = localStorage.getItem('crm_usuario');
+    const token = lsGet('crm_token');
+    const dadosUsuario = lsGet('crm_usuario');
 
     if (token && dadosUsuario) {
-      setUsuario(JSON.parse(dadosUsuario));
-      // Validar token no backend
+      try { setUsuario(JSON.parse(dadosUsuario)); } catch {}
       api.get('/auth/me')
         .then((res) => setUsuario(res.data))
         .catch(() => {
-          localStorage.removeItem('crm_token');
-          localStorage.removeItem('crm_usuario');
+          lsRemove('crm_token');
+          lsRemove('crm_usuario');
           setUsuario(null);
         })
         .finally(() => setCarregando(false));
@@ -30,15 +40,15 @@ export function AuthProvider({ children }) {
   async function login(email, senha) {
     const res = await api.post('/auth/login', { email, senha });
     const { token, usuario: dados } = res.data;
-    localStorage.setItem('crm_token', token);
-    localStorage.setItem('crm_usuario', JSON.stringify(dados));
+    lsSet('crm_token', token);
+    lsSet('crm_usuario', JSON.stringify(dados));
     setUsuario(dados);
     return dados;
   }
 
   function logout() {
-    localStorage.removeItem('crm_token');
-    localStorage.removeItem('crm_usuario');
+    lsRemove('crm_token');
+    lsRemove('crm_usuario');
     setUsuario(null);
   }
 

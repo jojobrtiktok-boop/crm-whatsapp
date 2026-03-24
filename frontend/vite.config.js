@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    target: ['es2019', 'safari14', 'chrome79', 'firefox67'],
+  },
   server: {
     port: 5173,
     proxy: {
