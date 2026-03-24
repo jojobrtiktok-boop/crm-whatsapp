@@ -197,34 +197,26 @@ async function executarBloco(execucaoId, bloco, funil) {
         where: { chave: 'pix_configs', contaId: chip.contaId },
       });
       let chavePix = '';
-      let tipoPix = 'cpf';
+      let nomePix = chip.nome || 'Pagamento';
       if (pixConfigRec?.valor) {
         try {
           const cfgs = JSON.parse(pixConfigRec.valor);
           const cfg = cfgs.find(c => c.chipId === chip.id);
-          if (cfg) { chavePix = cfg.chave; tipoPix = cfg.tipo || 'cpf'; }
+          if (cfg) { chavePix = cfg.chave; }
         } catch {}
       }
       const intro = bloco.data?.mensagem
-        ? bloco.data.mensagem.replace('{nome}', cliente.nome || 'amigo')
+        ? bloco.data.mensagem.replace('{nome}', cliente.nome || 'amigo') + '\n\n'
         : '';
+      const valor = parseFloat(bloco.data?.valor || 0) || 0;
       if (chavePix) {
-        // Envia card PIX nativo (botão "Copiar chave Pix") via WPPConnect
-        // Se o chip não for Business/BR, cai automaticamente no fallback de texto
-        const evolutionApi = require('./evolutionApi');
-        await evolutionApi.enviarPix(
-          chip.instanciaEvolution,
-          cliente.telefone,
-          chavePix,
-          tipoPix,
-          chip.nome || '',
-          'Brasil',
-          intro,
-        );
-        // Registra na conversa como texto para histórico
-        await criarConversa(cliente.id, chip.id, intro || 'PIX enviado', 'texto', null, chip.contaId);
+        const { gerarPixCopiaCola } = require('./pixUtils');
+        const codigoPix = gerarPixCopiaCola(chavePix, nomePix, 'Brasil', valor);
+        const valorStr = valor > 0 ? `\nValor: *R$ ${valor.toFixed(2).replace('.', ',')}*` : '';
+        const msgPix = `${intro}💳 *Pagamento via PIX*${valorStr}\n\nCopie o código abaixo e cole no seu app bancário em *Pix → Copia e Cola*:\n\n\`${codigoPix}\``;
+        await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msgPix, execucaoId, cliente.id, chip.id, chip.contaId);
       } else {
-        const msg = intro || 'Entre em contato para receber os dados de pagamento via PIX.';
+        const msg = `${intro}Entre em contato para receber os dados de pagamento via PIX.`;
         await agendarMensagem(chip.instanciaEvolution, cliente.telefone, msg, execucaoId, cliente.id, chip.id, chip.contaId);
       }
       await avancarParaProximoBloco(execucaoId, bloco.id, funil);

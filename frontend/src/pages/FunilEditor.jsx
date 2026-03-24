@@ -838,17 +838,29 @@ export default function FunilEditor() {
               <>
                 <div className="bg-green-50 border border-green-200 rounded-lg p-2">
                   <p className="text-xs text-green-700">
-                    Envia a chave PIX do chip automaticamente. Configure as chaves em <strong>Configurações → PIX</strong>.
+                    Gera o código <strong>PIX copia e cola</strong> automaticamente. Configure as chaves em <strong>Configurações → PIX</strong>.
                   </p>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Mensagem antes da chave (opcional)</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Mensagem antes do código (opcional)</label>
                   <textarea
                     value={blocoSelecionado.data.mensagem || ''}
                     onChange={(e) => atualizarBloco('mensagem', e.target.value)}
                     className="w-full rounded border-gray-300 text-xs resize-y min-h-[60px]"
                     rows={3}
-                    placeholder="Ex: Para finalizar sua compra, faça o pagamento via PIX:"
+                    placeholder="Ex: Para finalizar sua compra, pague via PIX:"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Valor em R$ (opcional, 0 = sem valor)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={blocoSelecionado.data.valor || ''}
+                    onChange={(e) => atualizarBloco('valor', e.target.value)}
+                    className="w-full rounded border-gray-300 text-xs"
+                    placeholder="0.00"
                   />
                 </div>
               </>
