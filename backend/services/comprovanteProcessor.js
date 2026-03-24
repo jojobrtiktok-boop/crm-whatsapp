@@ -138,43 +138,36 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         data: { status: 'comprou' },
       });
 
-      // Buscar configurações da conta para mensagem personalizada, PDF, etiqueta e upsell
+      // Buscar configurações da conta
       const configsConta = await prisma.configuracao.findMany({
-        where: { chave: { in: ['msg_pagamento_confirmado', 'etiqueta_pagamento_ativa', 'etiqueta_pagamento_id', 'confirmacao_pdf_ativo', 'confirmacao_pdf_url', 'upsell_ativo', 'upsell_tempo', 'upsell_unidade', 'upsell_blocos'] }, contaId },
+        where: { chave: { in: ['msg_pagamento_confirmado', 'etiqueta_pagamento_ativa', 'etiqueta_pagamento_id', 'confirmacao_pdf_ativo', 'confirmacao_pdf_url', 'confirmacao_pdfs', 'upsells'] }, contaId },
       }).catch(() => []);
       const cfgMap = Object.fromEntries(configsConta.map(c => [c.chave, c.valor]));
 
-      // Montar mensagem de confirmação (personalizada ou padrão por idioma)
-      let msgConfirmacao;
-      if (cfgMap.msg_pagamento_confirmado) {
-        const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, detectarPaisDeTelefone(telefoneCliente)) : 'N/A';
-        msgConfirmacao = cfgMap.msg_pagamento_confirmado.replace('{valor}', valorStr);
-      } else {
-        const paisCliente = detectarPaisDeTelefone(telefoneCliente);
-        const idiomaCliente = PAISES[paisCliente]?.idioma || 'pt';
-        const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : 'N/A';
-        const msgFn = MSGS_CONFIRMACAO[idiomaCliente] || MSGS_CONFIRMACAO['pt'];
-        msgConfirmacao = msgFn(valorStr);
+      // Carregar configs múltiplas de confirmação (novo formato)
+      const cfgConfigs = await prisma.configuracao.findFirst({
+        where: { chave: 'confirmacao_configs', contaId },
+      }).catch(() => null);
+      let confirmacaoConfigs = [];
+      if (cfgConfigs?.valor) {
+        try { confirmacaoConfigs = JSON.parse(cfgConfigs.valor); } catch {}
       }
 
-      try {
-        await enviarTexto(instanciaEvolution, telefoneCliente, msgConfirmacao);
-        // Salvar mensagem de confirmação no histórico
-        const conversaConf = await prisma.conversa.create({
-          data: { clienteId, chipId, tipo: 'enviada', conteudo: msgConfirmacao, status: 'enviado' },
-        });
-        emitir('mensagem:nova', { conversa: conversaConf, clienteId, chipId }, contaId);
-      } catch (err) {
-        console.error('[Comprovante] Erro ao enviar confirmação:', err.message);
-      }
+      // Encontrar configs que se aplicam a este chip (chipIds vazio = todos)
+      const chipIdStr = chipId?.toString();
+      const configsAplicaveis = confirmacaoConfigs.filter(c =>
+        !c.chipIds?.length || c.chipIds.includes(chipIdStr)
+      );
 
-      // Emitir evento venda:confirmada para push notifications
+      const { mensagemQueue } = require('../queues/setup');
+      const paisCliente = detectarPaisDeTelefone(telefoneCliente);
+      const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : 'N/A';
+
+      // Push notification
       try {
         const { io } = require('./socketManager');
-        const paisVenda = detectarPaisDeTelefone(telefoneCliente);
-        const valorFormatado = dados.valor ? formatarMoedaLocal(dados.valor, paisVenda) : null;
+        const valorFormatado = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : null;
         if (io) io.emit('venda:confirmada', { valor: dados.valor, valorFormatado, contaId });
-        // Push notification
         const { enviarPushParaTodos } = require('../routes/push');
         enviarPushParaTodos({
           title: `💰 ${valorFormatado || `R$ ${dados.valor}`} — Venda Confirmada!`,
@@ -183,21 +176,74 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         });
       } catch (_) {}
 
-      // Enviar PDFs junto com a confirmação, se configurado
-      if (cfgMap.confirmacao_pdf_ativo === 'true') {
-        // Suporte a múltiplos PDFs (confirmacao_pdfs) ou único (confirmacao_pdf_url)
-        let listaPdfs = [];
-        if (cfgMap.confirmacao_pdfs) {
-          try { listaPdfs = JSON.parse(cfgMap.confirmacao_pdfs); } catch { listaPdfs = []; }
-        } else if (cfgMap.confirmacao_pdf_url) {
-          listaPdfs = [{ url: cfgMap.confirmacao_pdf_url, nome: 'confirmacao.pdf' }];
+      if (configsAplicaveis.length > 0) {
+        // Novo formato: múltiplas configs por chip
+        for (const cfg of configsAplicaveis) {
+          // Chip a usar: o configurado ou o que recebeu o comprovante
+          const chipAtivo = await prisma.chip.findFirst({
+            where: cfg.chipId ? { id: parseInt(cfg.chipId), contaId } : { id: chipId, contaId },
+          }).catch(() => null);
+          const instancia = chipAtivo?.instanciaEvolution || instanciaEvolution;
+
+          // Mensagem de confirmação
+          if (cfg.msg) {
+            const msg = cfg.msg.replace('{valor}', valorStr);
+            const msgDelayMs = (parseInt(cfg.msg_delay) || 0) * 1000;
+            if (msgDelayMs > 0) {
+              await mensagemQueue.add({ tipo: 'texto', instancia, telefone: telefoneCliente, mensagem: msg }, { delay: msgDelayMs });
+            } else {
+              try {
+                await enviarTexto(instancia, telefoneCliente, msg);
+                const conv = await prisma.conversa.create({ data: { clienteId, chipId, tipo: 'enviada', conteudo: msg, status: 'enviado' } });
+                emitir('mensagem:nova', { conversa: conv, clienteId, chipId }, contaId);
+              } catch (err) { console.error('[Comprovante] Erro ao enviar msg:', err.message); }
+            }
+          }
+
+          // PDFs
+          if (cfg.pdf_ativo && cfg.pdfs?.length > 0) {
+            const pdfDelayMs = (parseInt(cfg.pdf_delay) || 0) * 1000;
+            for (let i = 0; i < cfg.pdfs.length; i++) {
+              const pdf = cfg.pdfs[i];
+              const delay = pdfDelayMs + (i * 2000);
+              if (delay > 0) {
+                await mensagemQueue.add({ tipo: 'documento', instancia, telefone: telefoneCliente, url: pdf.url, nomeArquivo: pdf.nome || 'confirmacao.pdf' }, { delay });
+              } else {
+                try {
+                  await enviarDocumento(instancia, telefoneCliente, pdf.url, pdf.nome || 'confirmacao.pdf');
+                  console.log('[Comprovante] PDF enviado:', pdf.nome);
+                } catch (err) { console.error('[Comprovante] Erro ao enviar PDF:', err.message); }
+              }
+            }
+          }
         }
-        for (const pdf of listaPdfs) {
-          try {
-            await enviarDocumento(instanciaEvolution, telefoneCliente, pdf.url, pdf.nome || 'confirmacao.pdf');
-            console.log('[Comprovante] PDF enviado:', pdf.nome || pdf.url);
-          } catch (err) {
-            console.error('[Comprovante] Erro ao enviar PDF:', err.message);
+      } else {
+        // Fallback: formato legado
+        let msgConfirmacao;
+        if (cfgMap.msg_pagamento_confirmado) {
+          msgConfirmacao = cfgMap.msg_pagamento_confirmado.replace('{valor}', valorStr);
+        } else {
+          const idiomaCliente = PAISES[paisCliente]?.idioma || 'pt';
+          const msgFn = MSGS_CONFIRMACAO[idiomaCliente] || MSGS_CONFIRMACAO['pt'];
+          msgConfirmacao = msgFn(valorStr);
+        }
+        try {
+          await enviarTexto(instanciaEvolution, telefoneCliente, msgConfirmacao);
+          const conv = await prisma.conversa.create({ data: { clienteId, chipId, tipo: 'enviada', conteudo: msgConfirmacao, status: 'enviado' } });
+          emitir('mensagem:nova', { conversa: conv, clienteId, chipId }, contaId);
+        } catch (err) { console.error('[Comprovante] Erro ao enviar confirmação:', err.message); }
+
+        if (cfgMap.confirmacao_pdf_ativo === 'true') {
+          let listaPdfs = [];
+          if (cfgMap.confirmacao_pdfs) {
+            try { listaPdfs = JSON.parse(cfgMap.confirmacao_pdfs); } catch {}
+          } else if (cfgMap.confirmacao_pdf_url) {
+            listaPdfs = [{ url: cfgMap.confirmacao_pdf_url, nome: 'confirmacao.pdf' }];
+          }
+          for (const pdf of listaPdfs) {
+            try {
+              await enviarDocumento(instanciaEvolution, telefoneCliente, pdf.url, pdf.nome || 'confirmacao.pdf');
+            } catch (err) { console.error('[Comprovante] Erro ao enviar PDF:', err.message); }
           }
         }
       }

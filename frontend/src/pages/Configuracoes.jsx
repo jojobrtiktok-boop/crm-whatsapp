@@ -279,14 +279,18 @@ function ConfigFunis() {
   );
 }
 
+function novaConfirmacaoConfig() {
+  return { id: Date.now().toString(), nome: '', chipId: '', msg: '', msg_delay: 0, pdf_ativo: false, pdfs: [], pdf_delay: 0 };
+}
+
 function ConfigPagamento() {
+  const [confirmacaoConfigs, setConfirmacaoConfigs] = useState([novaConfirmacaoConfig()]);
   const [configs, setConfigs] = useState({});
   const [chips, setChips] = useState([]);
   const [etiquetas, setEtiquetas] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [carregandoEtiquetas, setCarregandoEtiquetas] = useState(false);
-  const [pdfs, setPdfs] = useState([]); // [{url, nome}]
-  const [uploadandoPdf, setUploadandoPdf] = useState(false);
+  const [uploadandoPdf, setUploadandoPdf] = useState({});
 
   useEffect(() => {
     Promise.all([api.get('/chips'), api.get('/configuracoes')]).then(([resChips, resCfg]) => {
@@ -294,20 +298,24 @@ function ConfigPagamento() {
       setChips(chipsConectados);
       const cfg = resCfg.data;
       setConfigs({
-        msg_pagamento_confirmado: cfg.msg_pagamento_confirmado || '',
         etiqueta_pagamento_ativa: cfg.etiqueta_pagamento_ativa === 'true',
         etiqueta_pagamento_id: cfg.etiqueta_pagamento_id || '',
-        confirmacao_pdf_ativo: cfg.confirmacao_pdf_ativo === 'true',
       });
-      // Carregar múltiplos PDFs
-      if (cfg.confirmacao_pdfs) {
-        try { setPdfs(JSON.parse(cfg.confirmacao_pdfs)); } catch { setPdfs([]); }
-      } else if (cfg.confirmacao_pdf_url) {
-        setPdfs([{ url: cfg.confirmacao_pdf_url, nome: 'PDF de confirmação' }]);
+      // Carregar confirmacao_configs (novo formato)
+      if (cfg.confirmacao_configs) {
+        try {
+          const parsed = JSON.parse(cfg.confirmacao_configs);
+          if (parsed.length > 0) { setConfirmacaoConfigs(parsed); return; }
+        } catch {}
       }
-      if (chipsConectados.length > 0) {
-        buscarEtiquetas(chipsConectados[0].id);
+      // Migrar formato legado para novo
+      if (cfg.msg_pagamento_confirmado || cfg.confirmacao_pdfs || cfg.confirmacao_pdf_url) {
+        let pdfsLegados = [];
+        if (cfg.confirmacao_pdfs) { try { pdfsLegados = JSON.parse(cfg.confirmacao_pdfs); } catch {} }
+        else if (cfg.confirmacao_pdf_url) { pdfsLegados = [{ url: cfg.confirmacao_pdf_url, nome: 'PDF de confirmação' }]; }
+        setConfirmacaoConfigs([{ ...novaConfirmacaoConfig(), msg: cfg.msg_pagamento_confirmado || '', pdf_ativo: cfg.confirmacao_pdf_ativo === 'true', pdfs: pdfsLegados }]);
       }
+      if (chipsConectados.length > 0) buscarEtiquetas(chipsConectados[0].id);
     }).catch(console.error);
   }, []);
 
@@ -323,35 +331,40 @@ function ConfigPagamento() {
     }
   }
 
-  async function uploadPdf(files) {
-    setUploadandoPdf(true);
+  async function uploadPdf(cfgIdx, files) {
+    setUploadandoPdf(prev => ({ ...prev, [cfgIdx]: true }));
     try {
-      const novos = [...pdfs];
+      const novos = [...confirmacaoConfigs[cfgIdx].pdfs];
       for (const file of files) {
         const fd = new FormData();
         fd.append('arquivo', file);
         const res = await api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-        const base = window.location.origin.replace(':5173', ':3001');
-        novos.push({ url: base + res.data.url, nome: file.name });
+        novos.push({ url: window.location.origin + res.data.url, nome: file.name });
       }
-      setPdfs(novos);
+      atualizarConfig(cfgIdx, 'pdfs', novos);
     } catch { alert('Erro ao fazer upload do PDF'); }
-    finally { setUploadandoPdf(false); }
+    finally { setUploadandoPdf(prev => ({ ...prev, [cfgIdx]: false })); }
   }
 
-  function removerPdf(idx) {
-    setPdfs(prev => prev.filter((_, i) => i !== idx));
+  function atualizarConfig(idx, campo, valor) {
+    setConfirmacaoConfigs(prev => prev.map((c, i) => i === idx ? { ...c, [campo]: valor } : c));
+  }
+
+  function adicionarConfig() {
+    setConfirmacaoConfigs(prev => [...prev, novaConfirmacaoConfig()]);
+  }
+
+  function removerConfig(idx) {
+    setConfirmacaoConfigs(prev => prev.filter((_, i) => i !== idx));
   }
 
   async function salvar() {
     setSalvando(true);
     try {
       await api.put('/configuracoes', {
-        msg_pagamento_confirmado: configs.msg_pagamento_confirmado,
         etiqueta_pagamento_ativa: configs.etiqueta_pagamento_ativa ? 'true' : 'false',
         etiqueta_pagamento_id: configs.etiqueta_pagamento_id,
-        confirmacao_pdf_ativo: configs.confirmacao_pdf_ativo ? 'true' : 'false',
-        confirmacao_pdfs: JSON.stringify(pdfs),
+        confirmacao_configs: JSON.stringify(confirmacaoConfigs),
       });
       alert('Configurações salvas!');
     } catch {
@@ -362,126 +375,147 @@ function ConfigPagamento() {
   }
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-6 max-w-2xl space-y-6">
-      {/* Mensagem de confirmação */}
-      <div>
-        <h3 className="font-semibold text-gray-800 mb-1">Mensagem de Confirmação de Pagamento</h3>
-        <p className="text-xs text-gray-500 mb-3">
-          Enviada automaticamente ao confirmar comprovante. Use <code className="bg-gray-100 px-1 rounded">{'{valor}'}</code> para inserir o valor. Se vazio, usa o idioma padrão do chip.
-        </p>
-        <textarea
-          value={configs.msg_pagamento_confirmado || ''}
-          onChange={(e) => setConfigs(prev => ({ ...prev, msg_pagamento_confirmado: e.target.value }))}
-          className="w-full rounded-lg border-gray-300 text-sm"
-          rows={4}
-          placeholder="Ex: ✅ Pagamento confirmado! Valor: {valor}. Obrigado pela sua compra!"
-        />
-      </div>
-
-      {/* PDF junto com confirmação */}
-      <div className="border-t border-gray-100 pt-5">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <h3 className="font-semibold text-gray-800 flex items-center gap-1.5"><FileText size={15} /> Enviar PDF com a confirmação</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Envia um documento PDF após a mensagem de confirmação.</p>
+    <div className="space-y-4 max-w-2xl">
+      {/* Configs de confirmação */}
+      {confirmacaoConfigs.map((cfg, idx) => (
+        <div key={cfg.id} className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800 text-sm">Configuração {idx + 1}</h3>
+            {confirmacaoConfigs.length > 1 && (
+              <button onClick={() => removerConfig(idx)} className="text-gray-400 hover:text-red-500">
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
-          <button
-            onClick={() => setConfigs(prev => ({ ...prev, confirmacao_pdf_ativo: !prev.confirmacao_pdf_ativo }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configs.confirmacao_pdf_ativo ? 'bg-primary-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configs.confirmacao_pdf_ativo ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
-        {configs.confirmacao_pdf_ativo && (
-          <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-            {/* Lista de PDFs */}
-            {pdfs.length > 0 && (
-              <div className="space-y-2">
-                {pdfs.map((pdf, i) => (
+
+          {/* Chip */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Chip que envia a confirmação</label>
+            <select
+              value={cfg.chipId || ''}
+              onChange={(e) => atualizarConfig(idx, 'chipId', e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm"
+            >
+              <option value="">Todos os chips (mesmo que recebeu)</option>
+              {chips.map(c => <option key={c.id} value={c.id}>{c.nome || c.instanciaEvolution}</option>)}
+            </select>
+          </div>
+
+          {/* Mensagem */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">
+              Mensagem de confirmação — use <code className="bg-gray-100 px-1 rounded">{'{valor}'}</code>
+            </label>
+            <textarea
+              value={cfg.msg}
+              onChange={(e) => atualizarConfig(idx, 'msg', e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm"
+              rows={3}
+              placeholder="Ex: ✅ Pagamento confirmado! Valor: {valor}. Obrigado!"
+            />
+          </div>
+
+          {/* Delay mensagem */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+              <Clock size={12} /> Aguardar antes de enviar a mensagem
+            </label>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min="0"
+                value={cfg.msg_delay || 0}
+                onChange={(e) => atualizarConfig(idx, 'msg_delay', parseInt(e.target.value) || 0)}
+                className="w-24 rounded-lg border-gray-300 text-sm"
+              />
+              <span className="text-xs text-gray-500">segundos (0 = imediato)</span>
+            </div>
+          </div>
+
+          {/* PDF */}
+          <div className="border-t border-gray-100 pt-3">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-gray-700 flex items-center gap-1"><FileText size={13} /> Enviar PDF(s)</span>
+              <button
+                onClick={() => atualizarConfig(idx, 'pdf_ativo', !cfg.pdf_ativo)}
+                className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${cfg.pdf_ativo ? 'bg-primary-600' : 'bg-gray-300'}`}
+              >
+                <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${cfg.pdf_ativo ? 'translate-x-5' : 'translate-x-0.5'}`} />
+              </button>
+            </div>
+            {cfg.pdf_ativo && (
+              <div className="bg-gray-50 rounded-lg p-3 space-y-3">
+                {cfg.pdfs.map((pdf, i) => (
                   <div key={i} className="flex items-center gap-2 bg-white rounded-lg px-3 py-2 border border-gray-200">
-                    <FileText size={14} className="text-red-500 shrink-0" />
+                    <FileText size={13} className="text-red-500 shrink-0" />
                     <span className="text-xs flex-1 truncate">{pdf.nome}</span>
-                    <button onClick={() => removerPdf(i)} className="text-gray-400 hover:text-red-500 shrink-0">
-                      <Trash2 size={13} />
+                    <button onClick={() => atualizarConfig(idx, 'pdfs', cfg.pdfs.filter((_, j) => j !== i))} className="text-gray-400 hover:text-red-500">
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 ))}
+                <div>
+                  <input type="file" id={`pdf-upload-${idx}`} accept=".pdf" multiple className="hidden"
+                    onChange={(e) => { if (e.target.files?.length) { uploadPdf(idx, Array.from(e.target.files)); e.target.value = ''; } }} />
+                  <label htmlFor={`pdf-upload-${idx}`}
+                    className="flex items-center justify-center gap-1 w-full py-2 rounded-lg border border-dashed border-red-300 text-red-500 text-xs cursor-pointer hover:bg-red-50">
+                    {uploadandoPdf[idx] ? 'Enviando...' : <><Plus size={12} /> Adicionar PDF(s)</>}
+                  </label>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1 flex items-center gap-1">
+                    <Clock size={12} /> Aguardar antes de enviar o PDF
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <input type="number" min="0" value={cfg.pdf_delay || 0}
+                      onChange={(e) => atualizarConfig(idx, 'pdf_delay', parseInt(e.target.value) || 0)}
+                      className="w-24 rounded-lg border-gray-300 text-sm" />
+                    <span className="text-xs text-gray-500">segundos</span>
+                  </div>
+                </div>
               </div>
             )}
-            {/* Upload */}
-            <div>
-              <input
-                type="file"
-                id="pdf-pagamento-upload"
-                accept=".pdf"
-                multiple
-                className="hidden"
-                onChange={(e) => { if (e.target.files?.length) { uploadPdf(Array.from(e.target.files)); e.target.value = ''; } }}
-              />
-              <label
-                htmlFor="pdf-pagamento-upload"
-                className="flex items-center justify-center gap-2 w-full py-2.5 rounded-lg border border-dashed border-red-300 text-red-500 text-sm cursor-pointer hover:bg-red-50 transition-colors"
-              >
-                {uploadandoPdf ? 'Enviando...' : <><Plus size={14} /> Adicionar PDF(s)</>}
-              </label>
-              <p className="text-[10px] text-gray-400 mt-1">Pode adicionar quantos PDFs quiser. Todos serão enviados após a confirmação.</p>
-            </div>
           </div>
-        )}
-      </div>
+        </div>
+      ))}
+
+      <button onClick={adicionarConfig}
+        className="flex items-center gap-2 w-full py-2.5 rounded-xl border border-dashed border-primary-300 text-primary-600 text-sm justify-center hover:bg-primary-50 transition-colors">
+        <Plus size={15} /> Adicionar configuração para outro chip
+      </button>
 
       {/* Etiqueta automática */}
-      <div className="border-t border-gray-100 pt-5">
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="font-semibold text-gray-800">Etiqueta Automática no WhatsApp</h3>
+            <h3 className="font-semibold text-gray-800 text-sm">Etiqueta Automática no WhatsApp</h3>
             <p className="text-xs text-gray-500 mt-0.5">Etiqueta o contato em todos os chips ao confirmar pagamento.</p>
           </div>
-          <button
-            onClick={() => setConfigs(prev => ({ ...prev, etiqueta_pagamento_ativa: !prev.etiqueta_pagamento_ativa }))}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${configs.etiqueta_pagamento_ativa ? 'bg-primary-600' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${configs.etiqueta_pagamento_ativa ? 'translate-x-6' : 'translate-x-1'}`} />
+          <button onClick={() => setConfigs(prev => ({ ...prev, etiqueta_pagamento_ativa: !prev.etiqueta_pagamento_ativa }))}
+            className={`relative inline-flex h-5 w-10 items-center rounded-full transition-colors ${configs.etiqueta_pagamento_ativa ? 'bg-primary-600' : 'bg-gray-300'}`}>
+            <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform ${configs.etiqueta_pagamento_ativa ? 'translate-x-5' : 'translate-x-0.5'}`} />
           </button>
         </div>
-
         {configs.etiqueta_pagamento_ativa && (
-          <div className="bg-gray-50 rounded-lg p-4">
-            <label className="block text-xs text-gray-600 mb-2">Etiqueta a aplicar (em todos os chips)</label>
-            {carregandoEtiquetas ? (
-              <p className="text-xs text-gray-400">Carregando etiquetas...</p>
-            ) : etiquetas.length > 0 ? (
-              <select
-                value={configs.etiqueta_pagamento_id || ''}
-                onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
-                className="w-full rounded-lg border-gray-300 text-sm"
-              >
-                <option value="">Selecione uma etiqueta</option>
-                {etiquetas.map(et => (
-                  <option key={et.id} value={et.id}>{et.name || et.id}</option>
-                ))}
-              </select>
-            ) : (
-              <div className="space-y-1">
-                <input
-                  type="text"
-                  value={configs.etiqueta_pagamento_id || ''}
+          <div>
+            {carregandoEtiquetas ? <p className="text-xs text-gray-400">Carregando...</p>
+              : etiquetas.length > 0 ? (
+                <select value={configs.etiqueta_pagamento_id || ''} onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
+                  className="w-full rounded-lg border-gray-300 text-sm">
+                  <option value="">Selecione uma etiqueta</option>
+                  {etiquetas.map(et => <option key={et.id} value={et.id}>{et.name || et.id}</option>)}
+                </select>
+              ) : (
+                <input type="text" value={configs.etiqueta_pagamento_id || ''}
                   onChange={(e) => setConfigs(prev => ({ ...prev, etiqueta_pagamento_id: e.target.value }))}
-                  className="w-full rounded-lg border-gray-300 text-sm"
-                  placeholder="ID ou nome da etiqueta (ex: 1)"
-                />
-                <p className="text-xs text-gray-400">Nenhuma etiqueta encontrada automaticamente. Digite o ID manualmente.</p>
-              </div>
-            )}
+                  className="w-full rounded-lg border-gray-300 text-sm" placeholder="ID da etiqueta" />
+              )}
           </div>
         )}
       </div>
 
-      <button
-        onClick={salvar}
-        disabled={salvando}
-        className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-      >
+      <button onClick={salvar} disabled={salvando}
+        className="flex items-center gap-2 bg-primary-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
         <Save size={16} /> {salvando ? 'Salvando...' : 'Salvar Configurações'}
       </button>
     </div>
