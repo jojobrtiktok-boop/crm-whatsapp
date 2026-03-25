@@ -128,20 +128,24 @@ export default function WppPage() {
                     placeholder="Ex: Criativo Verão, Stories..." className="w-full rounded-lg border-gray-300 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Número do chip (com DDI)</label>
-                  <select value={cv.telefone} onChange={e => atualizar(idx, 'telefone', e.target.value)}
-                    className="w-full rounded-lg border-gray-300 text-sm">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Chip</label>
+                  <select value={cv.chipId || ''} onChange={e => {
+                    const chip = chips.find(c => String(c.id) === e.target.value);
+                    atualizar(idx, 'chipId', e.target.value);
+                    if (chip?.numero) atualizar(idx, 'telefone', chip.numero);
+                  }} className="w-full rounded-lg border-gray-300 text-sm">
                     <option value="">Selecionar chip...</option>
                     {chips.map(c => (
-                      <option key={c.id} value={c.numero}>{c.nome || c.instanciaEvolution} — {c.numero}</option>
+                      <option key={c.id} value={c.id}>{c.nome || c.instanciaEvolution}</option>
                     ))}
-                    <option value="__manual">Digitar manualmente...</option>
                   </select>
-                  {cv.telefone === '__manual' && (
-                    <input type="text" onChange={e => atualizar(idx, 'telefone', e.target.value)}
-                      placeholder="Ex: 5511999999999" className="w-full rounded-lg border-gray-300 text-sm mt-2" />
-                  )}
                 </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Número do WhatsApp (com DDI, sem + ou espaços)</label>
+                <input type="text" value={cv.telefone} onChange={e => atualizar(idx, 'telefone', e.target.value)}
+                  placeholder="Ex: 5511999999999" className="w-full rounded-lg border-gray-300 text-sm" />
+                <p className="text-xs text-gray-400 mt-1">Esse é o número que aparece no link do WhatsApp. Confirme com o chip selecionado.</p>
               </div>
 
               <div>
