@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, ChevronDown, ChevronUp, Film, Type, FileText, Image, Mic, Zap, GripVertical, Bell } from 'lucide-react';
+import { Save, Plus, Trash2, UserPlus, Shield, Clock, Ban, GitBranch, Play, Pause, Smartphone, CreditCard, Tag, ChevronDown, ChevronUp, Film, Type, FileText, Image, Mic, Zap, GripVertical, Bell, Radio } from 'lucide-react';
 import api from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { usePushNotifications } from '../hooks/usePushNotifications';
@@ -13,6 +13,7 @@ export default function Configuracoes() {
     { key: 'upsell', label: 'Upsell', icon: Zap },
     { key: 'pagamento', label: 'Pagamento', icon: CreditCard },
     { key: 'notificacoes', label: 'Notificações', icon: Bell },
+    { key: 'eventos', label: 'Eventos', icon: Radio },
     { key: 'usuarios', label: 'Usuarios', icon: Shield },
     { key: 'blacklist', label: 'Blacklist', icon: Ban },
   ];
@@ -61,6 +62,7 @@ export default function Configuracoes() {
       {abaAtiva === 'upsell' && <ConfigUpsell />}
       {abaAtiva === 'pagamento' && <ConfigPagamento />}
       {abaAtiva === 'notificacoes' && <ConfigNotificacoes />}
+      {abaAtiva === 'eventos' && <ConfigEventos />}
       {abaAtiva === 'usuarios' && <ConfigUsuarios />}
       {abaAtiva === 'blacklist' && <ConfigBlacklist />}
     </div>
@@ -985,6 +987,135 @@ const PAISES = [
   { codigo: 'US', nome: 'EUA 🇺🇸', moeda: 'USD', idioma: 'en' },
   { codigo: 'PT', nome: 'Portugal 🇵🇹', moeda: 'EUR', idioma: 'pt' },
 ];
+
+function ConfigEventos() {
+  const [ativo, setAtivo] = useState(false);
+  const [pixelId, setPixelId] = useState('');
+  const [token, setToken] = useState('');
+  const [salvando, setSalvando] = useState(false);
+  const [testando, setTestando] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  useEffect(() => {
+    api.get('/configuracoes').then(r => {
+      const cfg = r.data;
+      setAtivo(cfg.eventos_meta_ativo === 'true');
+      setPixelId(cfg.eventos_meta_pixel_id || '');
+      setToken(cfg.eventos_meta_token || '');
+    }).catch(console.error);
+  }, []);
+
+  async function salvar() {
+    setSalvando(true);
+    setMsg(null);
+    try {
+      await api.put('/configuracoes', { eventos_meta_ativo: String(ativo), eventos_meta_pixel_id: pixelId, eventos_meta_token: token });
+      setMsg({ tipo: 'ok', texto: 'Salvo com sucesso!' });
+    } catch {
+      setMsg({ tipo: 'erro', texto: 'Erro ao salvar.' });
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function testar() {
+    if (!pixelId || !token) { setMsg({ tipo: 'erro', texto: 'Preencha Pixel ID e Token antes de testar.' }); return; }
+    setTestando(true);
+    setMsg(null);
+    try {
+      await api.post('/configuracoes/testar-meta', { pixelId, token });
+      setMsg({ tipo: 'ok', texto: 'Evento de teste enviado! Verifique no Events Manager do Meta.' });
+    } catch (err) {
+      setMsg({ tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' });
+    } finally {
+      setTestando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6 max-w-xl">
+      {/* Meta Conversions API */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+              <Radio size={16} className="text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-800">Meta Conversions API</h3>
+              <p className="text-xs text-gray-500">Envia evento de compra automaticamente quando PIX for confirmado</p>
+            </div>
+          </div>
+          {/* Toggle */}
+          <button
+            onClick={() => setAtivo(v => !v)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${ativo ? 'bg-green-500' : 'bg-gray-300'}`}
+          >
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ativo ? 'translate-x-6' : 'translate-x-1'}`} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pixel ID</label>
+            <input
+              type="text"
+              value={pixelId}
+              onChange={e => setPixelId(e.target.value)}
+              placeholder="Ex: 1234567890123456"
+              className="w-full rounded-lg border-gray-300 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
+            <input
+              type="password"
+              value={token}
+              onChange={e => setToken(e.target.value)}
+              placeholder="Token gerado no Events Manager"
+              className="w-full rounded-lg border-gray-300 text-sm"
+            />
+            <p className="text-xs text-gray-400 mt-1">Events Manager → seu Pixel → Configurações → API de Conversões → Gerar token</p>
+          </div>
+        </div>
+
+        {msg && (
+          <p className={`text-sm px-3 py-2 rounded-lg ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+            {msg.texto}
+          </p>
+        )}
+
+        <div className="flex gap-2 pt-1">
+          <button
+            onClick={testar}
+            disabled={testando}
+            className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          >
+            {testando ? 'Testando...' : '🧪 Testar conexão'}
+          </button>
+          <button
+            onClick={salvar}
+            disabled={salvando}
+            className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+          >
+            <Save size={15} /> {salvando ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+
+        {ativo && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <p className="text-xs text-green-700 font-medium">✅ Ativo — evento Purchase será disparado automaticamente a cada PIX confirmado</p>
+          </div>
+        )}
+        {!ativo && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <p className="text-xs text-gray-500">⏸ Desativado — nenhum evento será enviado</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function ConfigUsuarios() {
   const [usuarios, setUsuarios] = useState([]);

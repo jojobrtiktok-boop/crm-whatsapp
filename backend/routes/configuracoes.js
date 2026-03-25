@@ -78,4 +78,23 @@ router.get('/proxy/test', async (req, res) => {
   }
 });
 
+// POST /api/configuracoes/testar-meta - Envia evento de teste para Meta Conversions API
+router.post('/testar-meta', async (req, res) => {
+  const { pixelId, token } = req.body;
+  if (!pixelId || !token) return res.status(400).json({ erro: 'pixelId e token são obrigatórios' });
+  try {
+    const { dispararPurchaseMeta } = require('../services/metaConversions');
+    await dispararPurchaseMeta({
+      pixelId,
+      accessToken: token,
+      telefone: '5511999999999', // número fictício para teste
+      valor: 1.00,
+      eventId: `teste_${Date.now()}`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 module.exports = router;
