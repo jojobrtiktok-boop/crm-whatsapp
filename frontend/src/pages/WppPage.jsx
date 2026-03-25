@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Copy, Plus, Trash2, Check, Globe, BookOpen } from 'lucide-react';
+import { Copy, Plus, Trash2, Check, Globe, BookOpen, Layout } from 'lucide-react';
 import api from '../api';
 
 function CopiarBtn({ texto }) {
@@ -18,6 +18,256 @@ function CopiarBtn({ texto }) {
 }
 
 const CV_VAZIO = () => ({ id: Date.now().toString(), nome: '', telefone: '', mensagem: 'Olá! Quero saber mais.' });
+
+function gerarHtmlModelo({ telefone, titulo, subtitulo, textoBotao, cvKey, mensagem }) {
+  const phone = (telefone || '').replace(/\D/g, '');
+  const msg = mensagem || 'Olá! Quero saber mais.';
+  const cv = cvKey || 'cv1';
+  return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>${titulo || 'Entre no WhatsApp'}</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #0a1628;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(37,211,102,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(37,211,102,0.05) 0%, transparent 50%);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 20px;
+    }
+    .card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(37,211,102,0.2);
+      border-radius: 24px;
+      padding: 48px 32px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 0 60px rgba(37,211,102,0.08);
+    }
+    .wpp-icon {
+      width: 72px;
+      height: 72px;
+      background: #25d366;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 24px;
+      box-shadow: 0 0 30px rgba(37,211,102,0.4);
+    }
+    .wpp-icon svg { width: 40px; height: 40px; fill: white; }
+    h1 {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1.3;
+      margin-bottom: 12px;
+    }
+    p {
+      color: rgba(255,255,255,0.55);
+      font-size: 14px;
+      line-height: 1.6;
+      margin-bottom: 36px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: #25d366;
+      color: white;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 16px 32px;
+      border-radius: 100px;
+      text-decoration: none;
+      width: 100%;
+      box-shadow: 0 4px 24px rgba(37,211,102,0.45);
+      animation: pulse 2s infinite;
+      transition: transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn svg { width: 22px; height: 22px; fill: white; flex-shrink: 0; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 4px 24px rgba(37,211,102,0.45); }
+      50% { box-shadow: 0 4px 40px rgba(37,211,102,0.75), 0 0 0 8px rgba(37,211,102,0.12); }
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(37,211,102,0.1);
+      border: 1px solid rgba(37,211,102,0.25);
+      color: #25d366;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-top: 24px;
+    }
+    .badge::before { content: '●'; font-size: 8px; animation: blink 1.5s infinite; }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="wpp-icon">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+      </svg>
+    </div>
+    <h1>${titulo || 'Fale com a gente agora'}</h1>
+    <p>${subtitulo || 'Clique no botão abaixo e entre em contato direto pelo WhatsApp. Atendimento rápido e personalizado.'}</p>
+    <a href="#" class="btn" id="wpp-btn">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+      </svg>
+      ${textoBotao || 'Entrar no WhatsApp'}
+    </a>
+    <div class="badge">Online agora</div>
+  </div>
+
+  <script>
+  (function() {
+    var params = new URLSearchParams(window.location.search);
+    var partes = [
+      '${cv}',
+      params.get('utm_campaign') || '',
+      params.get('utm_content') || '',
+      params.get('utm_source') || ''
+    ].filter(Boolean).join('|');
+    var texto = encodeURIComponent('${msg} [ref:' + partes + ']');
+    var href = 'https://api.whatsapp.com/send?phone=${phone}&text=' + texto;
+    document.getElementById('wpp-btn').href = href;
+  })();
+  </script>
+</body>
+</html>`;
+}
+
+function PageModelo() {
+  const [telefone, setTelefone] = useState('');
+  const [titulo, setTitulo] = useState('Fale com a gente agora');
+  const [subtitulo, setSubtitulo] = useState('Clique no botão abaixo e entre em contato direto pelo WhatsApp. Atendimento rápido e personalizado.');
+  const [textoBotao, setTextoBotao] = useState('Entrar no WhatsApp');
+  const [cvKey, setCvKey] = useState('cv1');
+  const [mensagem, setMensagem] = useState('Olá! Quero saber mais.');
+  const [copiado, setCopiado] = useState(false);
+
+  const html = gerarHtmlModelo({ telefone, titulo, subtitulo, textoBotao, cvKey, mensagem });
+
+  function copiar() {
+    navigator.clipboard.writeText(html).then(() => {
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    });
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Configurações */}
+      <div className="space-y-4">
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <h3 className="font-semibold text-gray-800">Configurar página</h3>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Número do WhatsApp (com DDI)</label>
+            <input type="text" value={telefone} onChange={e => setTelefone(e.target.value)}
+              placeholder="5511999999999" className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Título da página</label>
+            <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subtítulo</label>
+            <textarea value={subtitulo} onChange={e => setSubtitulo(e.target.value)}
+              rows={2} className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Texto do botão</label>
+              <input type="text" value={textoBotao} onChange={e => setTextoBotao(e.target.value)}
+                className="w-full rounded-lg border-gray-300 text-sm" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">CV (rastreio)</label>
+              <input type="text" value={cvKey} onChange={e => setCvKey(e.target.value)}
+                placeholder="cv1" className="w-full rounded-lg border-gray-300 text-sm" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem pré-preenchida</label>
+            <input type="text" value={mensagem} onChange={e => setMensagem(e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+        </div>
+
+        <button onClick={copiar}
+          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${copiado ? 'bg-green-600 text-white' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>
+          {copiado ? <><Check size={16} /> Código copiado! Cole no seu index.html</> : <><Copy size={16} /> Copiar código completo (index.html)</>}
+        </button>
+        <p className="text-xs text-gray-400 text-center">Salve como <code className="bg-gray-100 px-1 rounded">index.html</code> e suba no seu servidor ou hospedagem.</p>
+      </div>
+
+      {/* Preview mobile */}
+      <div className="flex flex-col items-center gap-3">
+        <p className="text-sm font-medium text-gray-600">Preview</p>
+        {/* Moldura de celular */}
+        <div className="relative" style={{ width: 280 }}>
+          <div className="bg-gray-900 rounded-[36px] p-3 shadow-2xl border-4 border-gray-700">
+            {/* Notch */}
+            <div className="bg-gray-800 rounded-full w-16 h-5 mx-auto mb-2" />
+            {/* Tela */}
+            <div className="rounded-[24px] overflow-hidden bg-[#0a1628]" style={{ height: 480 }}>
+              <div className="flex items-center justify-center h-full p-5">
+                <div className="w-full text-center">
+                  {/* Ícone */}
+                  <div className="w-14 h-14 bg-[#25d366] rounded-full flex items-center justify-center mx-auto mb-4"
+                    style={{ boxShadow: '0 0 20px rgba(37,211,102,0.5)' }}>
+                    <svg viewBox="0 0 24 24" className="w-8 h-8 fill-white">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                  </div>
+                  {/* Título */}
+                  <h3 className="text-white font-bold text-base mb-2 leading-tight">{titulo || 'Fale com a gente'}</h3>
+                  {/* Subtítulo */}
+                  <p className="text-xs mb-5 leading-relaxed px-1" style={{ color: 'rgba(255,255,255,0.5)' }}>
+                    {subtitulo?.substring(0, 80)}{subtitulo?.length > 80 ? '...' : ''}
+                  </p>
+                  {/* Botão */}
+                  <div className="flex items-center justify-center gap-2 bg-[#25d366] text-white text-sm font-bold py-3 px-5 rounded-full animate-pulse"
+                    style={{ boxShadow: '0 4px 20px rgba(37,211,102,0.5)' }}>
+                    <svg viewBox="0 0 24 24" className="w-4 h-4 fill-white shrink-0">
+                      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+                    </svg>
+                    {textoBotao || 'Entrar no WhatsApp'}
+                  </div>
+                  {/* Badge online */}
+                  <div className="inline-flex items-center gap-1.5 mt-4 text-[#25d366] text-[10px] font-semibold">
+                    <span className="w-1.5 h-1.5 rounded-full bg-[#25d366] animate-pulse" />
+                    Online agora
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function WppPage() {
   const [aba, setAba] = useState('paginas');
@@ -79,6 +329,7 @@ export default function WppPage() {
 
   const abas = [
     { key: 'paginas', label: 'Minhas Páginas', icon: Globe },
+    { key: 'modelo', label: 'Page Modelo', icon: Layout },
     { key: 'facebook', label: 'Guia Facebook', icon: BookOpen },
     { key: 'tiktok', label: 'Guia TikTok', icon: BookOpen },
   ];
@@ -177,6 +428,9 @@ export default function WppPage() {
           </div>
         </div>
       )}
+
+      {/* ─── Page Modelo ────────────────────────────────────────────────── */}
+      {aba === 'modelo' && <PageModelo />}
 
       {/* ─── Guia Facebook ──────────────────────────────────────────────── */}
       {aba === 'facebook' && (
