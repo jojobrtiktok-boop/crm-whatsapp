@@ -3,6 +3,19 @@ import { Send, User, GitBranch, Play, Smartphone, Bot, HeadphonesIcon, Paperclip
 import api from '../api';
 import { useSocket, useSocketEvent } from '../hooks/useSocket';
 
+// Formata exibição de telefone — trata @lid (contatos com privacidade ativada no WhatsApp)
+function exibirContato(lead) {
+  if (lead.nome) return lead.nome;
+  if (lead.telefone?.includes('@lid')) return 'Contato WhatsApp';
+  return lead.telefone || 'Sem nome';
+}
+
+function exibirTelefone(telefone) {
+  if (!telefone) return '';
+  if (telefone.includes('@lid')) return 'Número protegido pelo WhatsApp';
+  return telefone;
+}
+
 // Ícone de ticks de leitura WhatsApp
 function Ticks({ status }) {
   if (status === 'erro') {
@@ -260,7 +273,7 @@ export default function Atendimento() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1">
                   <p className="text-sm font-medium text-gray-800 truncate">
-                    {lead.nome || lead.telefone}
+                    {exibirContato(lead)}
                   </p>
                   {aba === 'pagos' && lead.ultimoComprovante ? (
                     <span className="text-[10px] font-bold text-green-600 shrink-0">
@@ -401,9 +414,9 @@ function ChatHeader({ lead, fotos, onVoltar, onAtivarFunil, mobile }) {
           }
         </div>
         <div className="min-w-0">
-          <h3 className="font-semibold text-gray-800 truncate">{lead.nome || 'Sem nome'}</h3>
+          <h3 className="font-semibold text-gray-800 truncate">{exibirContato(lead)}</h3>
           <div className="flex items-center gap-2">
-            <p className="text-xs text-gray-500 truncate">{lead.telefone}</p>
+            <p className="text-xs text-gray-500 truncate">{exibirTelefone(lead.telefone)}</p>
             {lead.chipOrigem && (
               <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-green-100 text-green-700 text-[10px] font-semibold rounded-md shrink-0">
                 <Smartphone size={10} />

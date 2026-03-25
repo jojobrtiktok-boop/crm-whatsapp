@@ -206,17 +206,11 @@ export default function Chips() {
         </button>
       </div>
 
-      {/* Status do proxy */}
+      {/* Status do proxy — só avisa se falhar */}
       {proxyStatus === 'fail' && (
         <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 text-yellow-800 rounded-xl px-4 py-3 text-sm">
           <AlertTriangle size={16} className="shrink-0 text-yellow-500" />
-          <span><strong>Proxy offline</strong> — os chips podem sofrer restrições do WhatsApp. Verifique em Configurações → Proxy.</span>
-        </div>
-      )}
-      {proxyStatus === 'ok' && (
-        <div className="flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 rounded-xl px-4 py-3 text-sm">
-          <ShieldCheck size={16} className="shrink-0 text-green-500" />
-          <span>Proxy ativo — chips protegidos.</span>
+          <span><strong>Proxy offline</strong> — os chips podem sofrer restrições do WhatsApp. Verifique em Configurações.</span>
         </div>
       )}
 
@@ -282,7 +276,7 @@ export default function Chips() {
                       <div className="flex items-center gap-1 group">
                         <div className="flex flex-col min-w-0">
                           <h3 className="font-semibold text-gray-800 text-sm truncate">{chip.nome}</h3>
-                          {chip.numero && <span className="text-[10px] text-gray-400">{chip.numero}</span>}
+                          <span className="text-[10px] text-gray-400">{chip.numero || chip.instanciaEvolution}</span>
                         </div>
                         <button
                           onClick={() => setRenomeando({ id: chip.id, nome: chip.nome })}
