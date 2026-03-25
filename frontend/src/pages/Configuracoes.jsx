@@ -988,131 +988,177 @@ const PAISES = [
   { codigo: 'PT', nome: 'Portugal 🇵🇹', moeda: 'EUR', idioma: 'pt' },
 ];
 
+function Toggle({ ativo, onChange }) {
+  return (
+    <button
+      onClick={() => onChange(!ativo)}
+      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors shrink-0 ${ativo ? 'bg-green-500' : 'bg-gray-300'}`}
+    >
+      <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ativo ? 'translate-x-6' : 'translate-x-1'}`} />
+    </button>
+  );
+}
+
+function PainelEvento({ titulo, descricao, corBg, ativo, onToggle, children, msg, onTestar, testando, onSalvar, salvando, dica }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className={`w-8 h-8 rounded-lg ${corBg} flex items-center justify-center shrink-0`}>
+            <Radio size={16} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <h3 className="font-semibold text-gray-800">{titulo}</h3>
+            <p className="text-xs text-gray-500">{descricao}</p>
+          </div>
+        </div>
+        <Toggle ativo={ativo} onChange={onToggle} />
+      </div>
+
+      {children}
+
+      {msg && (
+        <p className={`text-sm px-3 py-2 rounded-lg ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          {msg.texto}
+        </p>
+      )}
+
+      <div className="flex gap-2 pt-1">
+        <button onClick={onTestar} disabled={testando}
+          className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50">
+          {testando ? 'Testando...' : '🧪 Testar'}
+        </button>
+        <button onClick={onSalvar} disabled={salvando}
+          className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50">
+          <Save size={15} /> {salvando ? 'Salvando...' : 'Salvar'}
+        </button>
+      </div>
+
+      {dica && <p className="text-xs text-gray-400">{dica}</p>}
+
+      <div className={`rounded-lg p-3 ${ativo ? 'bg-green-50 border border-green-200' : 'bg-gray-50 border border-gray-200'}`}>
+        <p className={`text-xs font-medium ${ativo ? 'text-green-700' : 'text-gray-500'}`}>
+          {ativo ? '✅ Ativo — evento de compra disparado automaticamente a cada PIX confirmado' : '⏸ Desativado — nenhum evento será enviado'}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 function ConfigEventos() {
-  const [ativo, setAtivo] = useState(false);
-  const [pixelId, setPixelId] = useState('');
-  const [token, setToken] = useState('');
-  const [salvando, setSalvando] = useState(false);
-  const [testando, setTestando] = useState(false);
-  const [msg, setMsg] = useState(null);
+  const [metaAtivo, setMetaAtivo] = useState(false);
+  const [metaPixelId, setMetaPixelId] = useState('');
+  const [metaToken, setMetaToken] = useState('');
+  const [metaSalvando, setMetaSalvando] = useState(false);
+  const [metaTestando, setMetaTestando] = useState(false);
+  const [metaMsg, setMetaMsg] = useState(null);
+
+  const [tiktokAtivo, setTiktokAtivo] = useState(false);
+  const [tiktokPixelId, setTiktokPixelId] = useState('');
+  const [tiktokToken, setTiktokToken] = useState('');
+  const [tiktokSalvando, setTiktokSalvando] = useState(false);
+  const [tiktokTestando, setTiktokTestando] = useState(false);
+  const [tiktokMsg, setTiktokMsg] = useState(null);
 
   useEffect(() => {
     api.get('/configuracoes').then(r => {
       const cfg = r.data;
-      setAtivo(cfg.eventos_meta_ativo === 'true');
-      setPixelId(cfg.eventos_meta_pixel_id || '');
-      setToken(cfg.eventos_meta_token || '');
+      setMetaAtivo(cfg.eventos_meta_ativo === 'true');
+      setMetaPixelId(cfg.eventos_meta_pixel_id || '');
+      setMetaToken(cfg.eventos_meta_token || '');
+      setTiktokAtivo(cfg.eventos_tiktok_ativo === 'true');
+      setTiktokPixelId(cfg.eventos_tiktok_pixel_id || '');
+      setTiktokToken(cfg.eventos_tiktok_token || '');
     }).catch(console.error);
   }, []);
 
-  async function salvar() {
-    setSalvando(true);
-    setMsg(null);
+  async function salvarMeta() {
+    setMetaSalvando(true); setMetaMsg(null);
     try {
-      await api.put('/configuracoes', { eventos_meta_ativo: String(ativo), eventos_meta_pixel_id: pixelId, eventos_meta_token: token });
-      setMsg({ tipo: 'ok', texto: 'Salvo com sucesso!' });
-    } catch {
-      setMsg({ tipo: 'erro', texto: 'Erro ao salvar.' });
-    } finally {
-      setSalvando(false);
-    }
+      await api.put('/configuracoes', { eventos_meta_ativo: String(metaAtivo), eventos_meta_pixel_id: metaPixelId, eventos_meta_token: metaToken });
+      setMetaMsg({ tipo: 'ok', texto: 'Salvo com sucesso!' });
+    } catch { setMetaMsg({ tipo: 'erro', texto: 'Erro ao salvar.' }); }
+    finally { setMetaSalvando(false); }
   }
 
-  async function testar() {
-    if (!pixelId || !token) { setMsg({ tipo: 'erro', texto: 'Preencha Pixel ID e Token antes de testar.' }); return; }
-    setTestando(true);
-    setMsg(null);
+  async function testarMeta() {
+    if (!metaPixelId || !metaToken) { setMetaMsg({ tipo: 'erro', texto: 'Preencha Pixel ID e Token.' }); return; }
+    setMetaTestando(true); setMetaMsg(null);
     try {
-      await api.post('/configuracoes/testar-meta', { pixelId, token });
-      setMsg({ tipo: 'ok', texto: 'Evento de teste enviado! Verifique no Events Manager do Meta.' });
-    } catch (err) {
-      setMsg({ tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' });
-    } finally {
-      setTestando(false);
-    }
+      await api.post('/configuracoes/testar-meta', { pixelId: metaPixelId, token: metaToken });
+      setMetaMsg({ tipo: 'ok', texto: 'Evento enviado! Verifique no Events Manager.' });
+    } catch (err) { setMetaMsg({ tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' }); }
+    finally { setMetaTestando(false); }
+  }
+
+  async function salvarTikTok() {
+    setTiktokSalvando(true); setTiktokMsg(null);
+    try {
+      await api.put('/configuracoes', { eventos_tiktok_ativo: String(tiktokAtivo), eventos_tiktok_pixel_id: tiktokPixelId, eventos_tiktok_token: tiktokToken });
+      setTiktokMsg({ tipo: 'ok', texto: 'Salvo com sucesso!' });
+    } catch { setTiktokMsg({ tipo: 'erro', texto: 'Erro ao salvar.' }); }
+    finally { setTiktokSalvando(false); }
+  }
+
+  async function testarTikTok() {
+    if (!tiktokPixelId || !tiktokToken) { setTiktokMsg({ tipo: 'erro', texto: 'Preencha Pixel Code e Access Token.' }); return; }
+    setTiktokTestando(true); setTiktokMsg(null);
+    try {
+      await api.post('/configuracoes/testar-tiktok', { pixelId: tiktokPixelId, token: tiktokToken });
+      setTiktokMsg({ tipo: 'ok', texto: 'Evento enviado! Verifique no TikTok Events Manager.' });
+    } catch (err) { setTiktokMsg({ tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' }); }
+    finally { setTiktokTestando(false); }
   }
 
   return (
     <div className="space-y-6 max-w-xl">
-      {/* Meta Conversions API */}
-      <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-              <Radio size={16} className="text-blue-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-800">Meta Conversions API</h3>
-              <p className="text-xs text-gray-500">Envia evento de compra automaticamente quando PIX for confirmado</p>
-            </div>
-          </div>
-          {/* Toggle */}
-          <button
-            onClick={() => setAtivo(v => !v)}
-            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${ativo ? 'bg-green-500' : 'bg-gray-300'}`}
-          >
-            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${ativo ? 'translate-x-6' : 'translate-x-1'}`} />
-          </button>
-        </div>
-
+      <PainelEvento
+        titulo="Meta Conversions API"
+        descricao="Dispara evento Purchase quando PIX for confirmado"
+        corBg="bg-blue-500"
+        ativo={metaAtivo} onToggle={setMetaAtivo}
+        msg={metaMsg}
+        onTestar={testarMeta} testando={metaTestando}
+        onSalvar={salvarMeta} salvando={metaSalvando}
+        dica="Events Manager → seu Pixel → Configurações → API de Conversões → Gerar token de acesso"
+      >
         <div className="space-y-3">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Pixel ID</label>
-            <input
-              type="text"
-              value={pixelId}
-              onChange={e => setPixelId(e.target.value)}
-              placeholder="Ex: 1234567890123456"
-              className="w-full rounded-lg border-gray-300 text-sm"
-            />
+            <input type="text" value={metaPixelId} onChange={e => setMetaPixelId(e.target.value)}
+              placeholder="Ex: 1234567890123456" className="w-full rounded-lg border-gray-300 text-sm" />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
-            <input
-              type="password"
-              value={token}
-              onChange={e => setToken(e.target.value)}
-              placeholder="Token gerado no Events Manager"
-              className="w-full rounded-lg border-gray-300 text-sm"
-            />
-            <p className="text-xs text-gray-400 mt-1">Events Manager → seu Pixel → Configurações → API de Conversões → Gerar token</p>
+            <input type="password" value={metaToken} onChange={e => setMetaToken(e.target.value)}
+              placeholder="Token gerado no Events Manager" className="w-full rounded-lg border-gray-300 text-sm" />
           </div>
         </div>
+      </PainelEvento>
 
-        {msg && (
-          <p className={`text-sm px-3 py-2 rounded-lg ${msg.tipo === 'ok' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-            {msg.texto}
-          </p>
-        )}
-
-        <div className="flex gap-2 pt-1">
-          <button
-            onClick={testar}
-            disabled={testando}
-            className="flex items-center gap-1.5 px-4 py-2 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-          >
-            {testando ? 'Testando...' : '🧪 Testar conexão'}
-          </button>
-          <button
-            onClick={salvar}
-            disabled={salvando}
-            className="flex items-center gap-1.5 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-          >
-            <Save size={15} /> {salvando ? 'Salvando...' : 'Salvar'}
-          </button>
+      <PainelEvento
+        titulo="TikTok Events API"
+        descricao="Dispara evento PlaceAnOrder quando PIX for confirmado"
+        corBg="bg-black"
+        ativo={tiktokAtivo} onToggle={setTiktokAtivo}
+        msg={tiktokMsg}
+        onTestar={testarTikTok} testando={tiktokTestando}
+        onSalvar={salvarTikTok} salvando={tiktokSalvando}
+        dica="TikTok Ads → Assets → Events → Web Events → API de Eventos → Gerar Access Token"
+      >
+        <div className="space-y-3">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Pixel Code</label>
+            <input type="text" value={tiktokPixelId} onChange={e => setTiktokPixelId(e.target.value)}
+              placeholder="Ex: CXXXXXXXXXXXXXXX" className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
+            <input type="password" value={tiktokToken} onChange={e => setTiktokToken(e.target.value)}
+              placeholder="Token gerado no TikTok Events Manager" className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
         </div>
-
-        {ativo && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-            <p className="text-xs text-green-700 font-medium">✅ Ativo — evento Purchase será disparado automaticamente a cada PIX confirmado</p>
-          </div>
-        )}
-        {!ativo && (
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <p className="text-xs text-gray-500">⏸ Desativado — nenhum evento será enviado</p>
-          </div>
-        )}
-      </div>
+      </PainelEvento>
     </div>
   );
 }

@@ -12,6 +12,31 @@ const { emitir } = require('../services/socketManager');
 
 const prisma = new PrismaClient();
 
+// Detecta [ref:cv|campanha|criativo|fonte] na mensagem e salva origem do anúncio no lead
+async function salvarOrigemAd(cliente, conteudo, isNovo) {
+  if (!conteudo) return;
+  const match = conteudo.match(/\[ref:([^\]]+)\]/);
+  if (!match) return;
+  // Salva sempre que vier o ref (mesmo em leads antigos que voltam com novo criativo)
+  const partes = match[1].split('|');
+  const origemAd = {
+    cv: partes[0] || null,
+    campanha: partes[1] || null,
+    criativo: partes[2] || null,
+    fonte: partes[3] || null,
+    captadoEm: new Date().toISOString(),
+  };
+  try {
+    await prisma.cliente.update({
+      where: { id: cliente.id },
+      data: { origemAd },
+    });
+    console.log(`[Webhook] Origem ad salva para cliente ${cliente.id}:`, origemAd);
+  } catch (e) {
+    console.error('[Webhook] Erro ao salvar origemAd:', e.message);
+  }
+}
+
 // POST /api/webhook/evolution - Recebe eventos do WAHA
 router.post('/evolution', async (req, res) => {
   res.status(200).json({ recebido: true });
@@ -159,6 +184,9 @@ async function processarMensagemWaha(payload, instancia) {
 
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
 
+  // Detectar origem do anúncio
+  salvarOrigemAd(cliente, conteudo, isNovo);
+
   // Processar imagem (possível comprovante)
   if (tipoMidia === 'imagem' && payload.media?.url) {
     await processarImagemWaha(payload, instancia, cliente, chip);
@@ -280,6 +308,9 @@ async function processarMensagem(evento, instancia) {
   ]);
 
   emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
+
+  // Detectar [ref:cv|campanha|criativo|fonte] e salvar origem do anúncio
+  salvarOrigemAd(cliente, conteudo, isNovo2);
 
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
   await verificarEIniciarFunil(chip, cliente, conteudo);
@@ -425,6 +456,9 @@ async function processarMensagemWPP(data, instancia) {
       telefoneCliente: cliente.telefone,
     });
   }
+
+  // Detectar origem do anúncio
+  salvarOrigemAd(cliente, conteudo);
 
   // Processar no funil
   await processarRespostaFunil(cliente.id, conteudo, tipoMidia);

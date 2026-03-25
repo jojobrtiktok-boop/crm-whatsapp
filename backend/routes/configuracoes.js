@@ -78,6 +78,25 @@ router.get('/proxy/test', async (req, res) => {
   }
 });
 
+// POST /api/configuracoes/testar-tiktok - Envia evento de teste para TikTok Events API
+router.post('/testar-tiktok', async (req, res) => {
+  const { pixelId, token } = req.body;
+  if (!pixelId || !token) return res.status(400).json({ erro: 'pixelId e token são obrigatórios' });
+  try {
+    const { dispararPurchaseTikTok } = require('../services/tiktokConversions');
+    await dispararPurchaseTikTok({
+      pixelId,
+      accessToken: token,
+      telefone: '5511999999999',
+      valor: 1.00,
+      eventId: `teste_${Date.now()}`,
+    });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ erro: err.message });
+  }
+});
+
 // POST /api/configuracoes/testar-meta - Envia evento de teste para Meta Conversions API
 router.post('/testar-meta', async (req, res) => {
   const { pixelId, token } = req.body;

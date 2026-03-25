@@ -182,6 +182,25 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
         console.error('[Comprovante] Erro Meta Conversions:', errMeta.message);
       }
 
+      // TikTok Events API
+      try {
+        const cfgTiktok = await prisma.configuracao.findMany({
+          where: { chave: { in: ['eventos_tiktok_ativo', 'eventos_tiktok_pixel_id', 'eventos_tiktok_token'] }, contaId },
+        }).catch(() => []);
+        const tiktokMap = Object.fromEntries(cfgTiktok.map(c => [c.chave, c.valor]));
+        if (tiktokMap.eventos_tiktok_ativo === 'true' && tiktokMap.eventos_tiktok_pixel_id && tiktokMap.eventos_tiktok_token && dados.valor) {
+          const { dispararPurchaseTikTok } = require('./tiktokConversions');
+          await dispararPurchaseTikTok({
+            pixelId: tiktokMap.eventos_tiktok_pixel_id,
+            accessToken: tiktokMap.eventos_tiktok_token,
+            telefone: telefoneCliente,
+            valor: dados.valor,
+          });
+        }
+      } catch (errTiktok) {
+        console.error('[Comprovante] Erro TikTok Conversions:', errTiktok.message);
+      }
+
       // Push notification
       try {
         const { io } = require('./socketManager');

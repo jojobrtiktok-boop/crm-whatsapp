@@ -9,6 +9,7 @@ import {
   Settings,
   LogOut,
   Bell,
+  Globe,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -21,6 +22,7 @@ const menuItems = [
   { path: '/chips', label: 'Chips', icon: Smartphone },
   { path: '/funis', label: 'Funis', icon: GitBranch },
   { path: '/atendimento', label: 'Atendimento', icon: MessageCircle },
+  { path: '/wpp-page', label: 'WPP Page', icon: Globe },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
 ];
 
