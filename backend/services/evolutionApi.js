@@ -22,11 +22,10 @@ function formatPhone(telefone) {
   return `${telefone}@c.us`;
 }
 
-// Obtém token da sessão (gera se não existir)
+// Obtém token da sessão — sempre chama generate-token para evitar token stale
+// (Baileys gera novo token aleatório a cada reinício; cache causa 401)
 // WPPConnect: secretKey vai na URL - POST /api/:session/:secretkey/generate-token
 async function getToken(sessao) {
-  if (tokenCache[sessao]) return tokenCache[sessao];
-
   const response = await axios.post(
     `${BASE_URL}/api/${sessao}/${SECRET_KEY}/generate-token`,
     {},
