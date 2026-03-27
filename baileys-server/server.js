@@ -404,20 +404,23 @@ async function startBaileysSession(sessionName) {
 
     if (connection === 'close') {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
-      const loggedOut = statusCode === DisconnectReason.loggedOut;
-      console.log(`[${sessionName}] Desconectado (${statusCode}). Reconectar: ${!loggedOut}`);
-      sess.status = 'CLOSED';
+      // 401 = logout voluntário, 403 = banido/revogado pelo WhatsApp — ambos não reconectar
+      const parar = statusCode === DisconnectReason.loggedOut || statusCode === 403;
+      console.log(`[${sessionName}] Desconectado (${statusCode}). Reconectar: ${!parar}`);
+      sess.status = parar ? 'BANNED' : 'CLOSED';
 
       if (sess.webhookUrl) {
         await fireWebhook(sess.webhookUrl, sessionName, {
           event: 'onstatechange',
-          data: 'CLOSED',
+          data: sess.status,
         });
       }
 
-      if (!loggedOut) {
+      if (!parar) {
         console.log(`[${sessionName}] Reconectando em 5s...`);
         setTimeout(() => startBaileysSession(sessionName).catch(() => {}), 5000);
+      } else if (statusCode === 403) {
+        console.log(`[${sessionName}] ⛔ Sessão banida/revogada pelo WhatsApp. Parando reconexão.`);
       }
     }
   });
