@@ -327,7 +327,8 @@ export default function FunilEditor() {
       atualizarBloco('url', res.data.url);
       atualizarBloco('nomeArquivo', file.name);
     } catch (err) {
-      alert('Erro ao enviar arquivo');
+      const msg = err.response?.data?.erro || err.message || 'Erro ao enviar arquivo';
+      alert(msg);
       console.error(err);
     } finally {
       setUploading(false);
