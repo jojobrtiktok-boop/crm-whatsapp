@@ -32,4 +32,7 @@ module.exports = {
     path: process.env.UPLOAD_PATH || './uploads',
     maxFileSize: parseInt(process.env.MAX_FILE_SIZE) || 10485760, // 10MB
   },
+
+  // URL pública do servidor (usada para configurar webhooks)
+  publicUrl: process.env.PUBLIC_URL || null,
 };

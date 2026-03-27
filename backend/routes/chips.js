@@ -218,7 +218,9 @@ router.post('/:id/webhook', async (req, res, next) => {
       return res.status(404).json({ erro: 'Chip nao encontrado' });
     }
 
-    const webhookUrl = `${req.protocol}://${req.get('host')}/api/webhook/evolution`;
+    const config = require('../config');
+    const baseUrl = config.publicUrl || `https://${req.get('host')}`;
+    const webhookUrl = `${baseUrl}/api/webhook/evolution`;
     const resultado = await evolutionApi.configurarWebhook(chip.instanciaEvolution, webhookUrl);
     res.json({ mensagem: 'Webhook configurado', resultado });
   } catch (err) {
