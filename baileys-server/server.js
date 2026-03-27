@@ -163,7 +163,7 @@ app.post('/api/:session/request-pairing-code', verifyToken, async (req, res) => 
   }
 });
 
-// Fechar sessão
+// Fechar sessão (e apagar arquivos do disco para não reconectar no próximo restart)
 app.post('/api/:session/close-session', verifyToken, async (req, res) => {
   const { session } = req.params;
   const sess = sessions[session];
@@ -171,10 +171,10 @@ app.post('/api/:session/close-session', verifyToken, async (req, res) => {
     try { await sess.socket.logout(); } catch {}
     sess.socket = null;
   }
-  if (sess) {
-    sess.status = 'CLOSED';
-    sess.qrBase64 = null;
-  }
+  // Remover do mapa de sessões e apagar arquivos do disco
+  delete sessions[session];
+  const authDir = path.join(AUTH_DIR, session);
+  try { fs.rmSync(authDir, { recursive: true, force: true }); } catch {}
   res.json({ status: 'CLOSED' });
 });
 
