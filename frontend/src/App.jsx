@@ -11,6 +11,7 @@ import FunilEditor from './pages/FunilEditor';
 import Atendimento from './pages/Atendimento';
 import Configuracoes from './pages/Configuracoes';
 import WppPage from './pages/WppPage';
+import Disparo from './pages/Disparo';
 
 // Rota protegida - redireciona para login se não autenticado
 function RotaProtegida({ children }) {
@@ -50,6 +51,7 @@ export default function App() {
                 <Route path="/atendimento" element={<Atendimento />} />
                 <Route path="/configuracoes" element={<Configuracoes />} />
                 <Route path="/wpp-page" element={<WppPage />} />
+                <Route path="/disparo" element={<Disparo />} />
               </Routes>
             </Layout>
           </RotaProtegida>

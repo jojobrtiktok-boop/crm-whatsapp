@@ -349,6 +349,13 @@ async function baixarMidia(sessao, messageId) {
   return null;
 }
 
+// Listar grupos do WhatsApp em que a sessão participa
+async function listarGrupos(sessao) {
+  const api = await apiFor(sessao);
+  const response = await api.get(`/api/${sessao}/list-groups`);
+  return response.data || [];
+}
+
 // Listar etiquetas disponíveis (WhatsApp Business)
 async function listarEtiquetas(sessao) {
   try {
@@ -384,6 +391,7 @@ async function buscarFotoPerfil(sessao, telefone) {
 }
 
 module.exports = {
+  listarGrupos,
   enviarTexto,
   enviarImagem,
   enviarAudio,

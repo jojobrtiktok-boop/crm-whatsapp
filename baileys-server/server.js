@@ -321,6 +321,24 @@ app.post('/api/:session/label-chat', verifyToken, async (req, res) => {
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok', sessions: Object.keys(sessions) }));
 
+// Listar grupos do WhatsApp
+app.get('/api/:session/list-groups', verifyToken, async (req, res) => {
+  const sess = sessions[req.params.session];
+  if (!sess?.socket || sess.status !== 'CONNECTED')
+    return res.status(400).json({ error: 'Session not connected' });
+  try {
+    const grupos = await sess.socket.groupFetchAllParticipating();
+    const lista = Object.values(grupos).map(g => ({
+      id: g.id,
+      nome: g.subject,
+      participantes: g.participants?.length || 0,
+    }));
+    res.json(lista);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Baileys Session ────────────────────────────────────────────────────────
 
 async function startBaileysSession(sessionName) {

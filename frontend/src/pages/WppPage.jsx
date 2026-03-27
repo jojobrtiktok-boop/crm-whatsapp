@@ -125,23 +125,41 @@ function gerarHtmlModelo({ telefone, textoBotao, badge, cvKey, mensagem, tema })
 </html>`;
 }
 
-function PageModelo() {
-  const [telefone, setTelefone] = useState('');
-  const [textoBotao, setTextoBotao] = useState('Entrar no WhatsApp');
-  const [badge, setBadge] = useState('Online agora');
-  const [cvKey, setCvKey] = useState('cv1');
-  const [mensagem, setMensagem] = useState('Olá! Quero saber mais.');
-  const [tema, setTema] = useState('escuro');
+function CopiarBtnHtml({ html }) {
   const [copiado, setCopiado] = useState(false);
-
-  const html = gerarHtmlModelo({ telefone, textoBotao, badge, cvKey, mensagem, tema });
-  const isDark = tema === 'escuro';
-
   function copiar() {
     navigator.clipboard.writeText(html).then(() => {
       setCopiado(true);
       setTimeout(() => setCopiado(false), 2500);
     });
+  }
+  return (
+    <button onClick={copiar}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${copiado ? 'bg-green-600 text-white' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>
+      {copiado ? <><Check size={13} /> Copiado!</> : <><Copy size={13} /> Copiar HTML</>}
+    </button>
+  );
+}
+
+function PageModelo() {
+  const [telefone, setTelefone] = useState('');
+  const [textoBotao, setTextoBotao] = useState('Entrar no WhatsApp');
+  const [badge, setBadge] = useState('Online agora');
+  const [cvKeys, setCvKeys] = useState(['cv1']);
+  const [mensagem, setMensagem] = useState('Olá! Quero saber mais.');
+  const [tema, setTema] = useState('escuro');
+  const isDark = tema === 'escuro';
+
+  function adicionarCv() {
+    setCvKeys(prev => [...prev, `cv${prev.length + 1}`]);
+  }
+
+  function removerCv(idx) {
+    setCvKeys(prev => prev.filter((_, i) => i !== idx));
+  }
+
+  function atualizarCv(idx, valor) {
+    setCvKeys(prev => prev.map((k, i) => i === idx ? valor : k));
   }
 
   return (
@@ -181,30 +199,53 @@ function PageModelo() {
             <input type="text" value={badge} onChange={e => setBadge(e.target.value)}
               placeholder="Online agora" className="w-full rounded-lg border-gray-300 text-sm" />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">CV (rastreio)</label>
-              <input type="text" value={cvKey} onChange={e => setCvKey(e.target.value)}
-                placeholder="cv1" className="w-full rounded-lg border-gray-300 text-sm" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem pré-preenchida</label>
-              <input type="text" value={mensagem} onChange={e => setMensagem(e.target.value)}
-                className="w-full rounded-lg border-gray-300 text-sm" />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Mensagem pré-preenchida</label>
+            <input type="text" value={mensagem} onChange={e => setMensagem(e.target.value)}
+              className="w-full rounded-lg border-gray-300 text-sm" />
           </div>
         </div>
 
-        <button onClick={copiar}
-          className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all ${copiado ? 'bg-green-600 text-white' : 'bg-primary-600 text-white hover:bg-primary-700'}`}>
-          {copiado ? <><Check size={16} /> Copiado! Cole no index.html</> : <><Copy size={16} /> Copiar index.html completo</>}
-        </button>
-        <p className="text-xs text-gray-400 text-center">Salve como <code className="bg-gray-100 px-1 rounded">index.html</code> e suba no seu servidor.</p>
+        {/* CVs */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold text-gray-800">CVs (variações)</h3>
+            <button onClick={adicionarCv}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-600 text-white rounded-lg text-xs hover:bg-primary-700">
+              <Plus size={13} /> Adicionar CV
+            </button>
+          </div>
+          <p className="text-xs text-gray-400">Cada CV gera uma página HTML independente — mesmo número, caminhos diferentes (ex: /cv1, /cv2).</p>
+
+          {cvKeys.map((key, idx) => {
+            const html = gerarHtmlModelo({ telefone, textoBotao, badge, cvKey: key, mensagem, tema });
+            return (
+              <div key={idx} className="flex items-center gap-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                <span className="text-xs font-bold text-primary-600 bg-primary-50 px-2 py-1 rounded-md shrink-0">#{idx + 1}</span>
+                <input
+                  type="text"
+                  value={key}
+                  onChange={e => atualizarCv(idx, e.target.value)}
+                  placeholder="cv1"
+                  className="flex-1 rounded-lg border-gray-300 text-sm py-1.5"
+                />
+                <CopiarBtnHtml html={html} />
+                {cvKeys.length > 1 && (
+                  <button onClick={() => removerCv(idx)}
+                    className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg shrink-0">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs text-gray-400 text-center">Salve cada HTML como <code className="bg-gray-100 px-1 rounded">index.html</code> na pasta do CV correspondente no servidor.</p>
       </div>
 
       {/* Preview mobile */}
       <div className="flex flex-col items-center gap-3">
-        <p className="text-sm font-medium text-gray-600">Preview</p>
+        <p className="text-sm font-medium text-gray-600">Preview ({cvKeys[0] || 'cv1'})</p>
         <div style={{ width: 260 }}>
           <div className="bg-gray-900 rounded-[36px] p-3 shadow-2xl border-4 border-gray-700">
             <div className="bg-gray-800 rounded-full w-14 h-4 mx-auto mb-2" />

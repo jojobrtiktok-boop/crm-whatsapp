@@ -13,6 +13,7 @@ const { inicializarSocketManager } = require('./services/socketManager');
 // Registrar processadores das filas
 require('./queues/mensagemQueue');
 require('./queues/comprovanteQueue');
+require('./queues/disparoQueue');
 
 const app = express();
 const server = http.createServer(app);
@@ -60,6 +61,7 @@ app.use('/api/usuarios', require('./routes/usuarios'));
 app.use('/api/blacklist', require('./routes/blacklist'));
 app.use('/api/upload', require('./routes/upload'));
 app.use('/api/push', require('./routes/push'));
+app.use('/api/disparo', require('./routes/disparo'));
 
 // Servir frontend em produção
 if (config.nodeEnv === 'production') {

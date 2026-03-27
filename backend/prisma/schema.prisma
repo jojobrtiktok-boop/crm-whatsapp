@@ -40,6 +40,7 @@ model Chip {
   vendas       Venda[]
   comprovantes Comprovante[]
   execucoes    FunilExecucao[]
+  disparos     Disparo[]
 
   @@map("chips")
 }
@@ -231,6 +232,27 @@ model Configuracao {
 
   @@unique([chave, contaId])
   @@map("configuracoes")
+}
+
+// Disparos em massa para grupos WhatsApp
+model Disparo {
+  id             Int      @id @default(autoincrement())
+  nome           String
+  contaId        Int      @map("conta_id")
+  chipId         Int      @map("chip_id")
+  grupos         Json     // [{id, nome, participantes}]
+  mensagem       String?
+  linhasPlanilha Json?    @map("linhas_planilha") // [{mensagem, horario}]
+  tipo           String   @default("imediato") // imediato, agendado
+  delaySegundos  Int      @default(20) @map("delay_segundos")
+  totalEnvios    Int      @default(0) @map("total_envios")
+  enviados       Int      @default(0)
+  status         String   @default("enviando") // enviando, agendado, concluido, erro_parcial
+  criadoEm       DateTime @default(now()) @map("criado_em")
+
+  chip Chip @relation(fields: [chipId], references: [id])
+
+  @@map("disparos")
 }
 
 // Números bloqueados

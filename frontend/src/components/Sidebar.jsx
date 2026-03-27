@@ -10,6 +10,7 @@ import {
   LogOut,
   Bell,
   Globe,
+  Send,
 } from 'lucide-react';
 import { useState, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
@@ -21,6 +22,7 @@ const menuItems = [
   { path: '/vendas', label: 'Vendas', icon: ShoppingCart },
   { path: '/chips', label: 'Chips', icon: Smartphone },
   { path: '/funis', label: 'Funis', icon: GitBranch },
+  { path: '/disparo', label: 'Disparo', icon: Send },
   { path: '/atendimento', label: 'Atendimento', icon: MessageCircle },
   { path: '/wpp-page', label: 'WPP Page', icon: Globe },
   { path: '/configuracoes', label: 'Configurações', icon: Settings },
