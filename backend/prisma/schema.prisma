@@ -30,6 +30,9 @@ model Chip {
   nome               String   // "Chip 5023"
   numero             String
   instanciaEvolution String   @map("instancia_evolution")
+  tipo               String   @default("evolution") @map("tipo") // evolution | meta
+  metaPhoneNumberId  String?  @map("meta_phone_number_id")
+  metaAccessToken    String?  @map("meta_access_token")
   ativo              Boolean  @default(true)
   criadoEm           DateTime @default(now()) @map("criado_em")
 

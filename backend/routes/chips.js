@@ -3,6 +3,7 @@ const router = require('express').Router();
 const { PrismaClient } = require('@prisma/client');
 const { autenticar } = require('../middleware/auth');
 const evolutionApi = require('../services/evolutionApi');
+const metaApi = require('../services/metaApi');
 
 const prisma = new PrismaClient();
 
@@ -24,14 +25,19 @@ router.get('/', async (req, res, next) => {
       },
     });
 
-    // Buscar status de cada chip na Evolution API
+    // Buscar status de cada chip (Evolution ou Meta)
     const chipsComStatus = await Promise.all(
       chips.map(async (chip) => {
         try {
-          const status = await evolutionApi.verificarStatus(chip.instanciaEvolution);
-          return { ...chip, statusConexao: status?.state || status?.instance?.state || 'close' };
+          let status;
+          if (chip.tipo === 'meta') {
+            status = await metaApi.verificarStatus(chip.metaPhoneNumberId, chip.metaAccessToken);
+          } else {
+            status = await evolutionApi.verificarStatus(chip.instanciaEvolution);
+          }
+          return { ...chip, statusConexao: status?.state || status?.instance?.state || 'close', metaAccessToken: undefined };
         } catch {
-          return { ...chip, statusConexao: 'close' };
+          return { ...chip, statusConexao: 'close', metaAccessToken: undefined };
         }
       })
     );
@@ -94,20 +100,42 @@ router.post('/sincronizar', async (req, res, next) => {
   }
 });
 
-// POST /api/chips - Criar novo chip (só nome obrigatório)
+// POST /api/chips - Criar novo chip (Evolution ou Meta)
 router.post('/', async (req, res, next) => {
   try {
-    const { nome } = req.body;
+    const { nome, tipo = 'evolution', metaPhoneNumberId, metaAccessToken } = req.body;
 
     if (!nome) {
       return res.status(400).json({ erro: 'Nome é obrigatorio' });
     }
 
-    // Gerar nome único da instancia
+    // Fluxo Meta Cloud API
+    if (tipo === 'meta') {
+      if (!metaPhoneNumberId || !metaAccessToken) {
+        return res.status(400).json({ erro: 'Phone Number ID e Access Token são obrigatórios para chips Meta' });
+      }
+
+      // Validar credenciais imediatamente
+      const check = await metaApi.verificarStatus(metaPhoneNumberId, metaAccessToken);
+      if (check.state !== 'open') {
+        return res.status(400).json({ erro: 'Credenciais Meta inválidas. Verifique o Phone Number ID e o Access Token.' });
+      }
+
+      // instanciaEvolution recebe stub determinístico para manter compatibilidade do banco
+      const instanciaEvolution = `meta-${metaPhoneNumberId}`;
+
+      const chip = await prisma.chip.create({
+        data: { nome, numero: metaPhoneNumberId, tipo: 'meta', instanciaEvolution, metaPhoneNumberId, metaAccessToken, contaId: req.usuario.contaId },
+      });
+
+      console.log(`[Chips] Chip Meta criado: ${nome} (${metaPhoneNumberId})`);
+      return res.status(201).json({ ...chip, metaAccessToken: undefined });
+    }
+
+    // Fluxo Evolution API (padrão)
     const base = nome.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     const instanciaEvolution = `${base}-${Date.now()}`;
 
-    // Criar instancia na Evolution API
     let erroEvolution = null;
     try {
       await evolutionApi.criarInstancia(instanciaEvolution);
@@ -117,9 +145,8 @@ router.post('/', async (req, res, next) => {
       console.error('Erro ao criar instancia Evolution:', erroEvolution);
     }
 
-    // Salvar chip no banco mesmo se Evolution falhar
     const chip = await prisma.chip.create({
-      data: { nome, numero: '', instanciaEvolution, contaId: req.usuario.contaId },
+      data: { nome, numero: '', instanciaEvolution, tipo: 'evolution', contaId: req.usuario.contaId },
     });
 
     res.status(201).json({ ...chip, erroEvolution });
@@ -137,6 +164,10 @@ router.get('/:id/qrcode', async (req, res, next) => {
 
     if (!chip) {
       return res.status(404).json({ erro: 'Chip nao encontrado' });
+    }
+
+    if (chip.tipo === 'meta') {
+      return res.status(400).json({ erro: 'Chips Meta não usam QR Code. Conexão é via credenciais da API.' });
     }
 
     // Verificar se ja esta conectado
@@ -172,6 +203,10 @@ router.post('/:id/pairingcode', async (req, res, next) => {
       return res.status(404).json({ erro: 'Chip nao encontrado' });
     }
 
+    if (chip.tipo === 'meta') {
+      return res.status(400).json({ erro: 'Chips Meta não usam código de pareamento.' });
+    }
+
     const { telefone } = req.body;
     if (!telefone) {
       return res.status(400).json({ erro: 'Telefone obrigatorio' });
@@ -199,7 +234,12 @@ router.get('/:id/status', async (req, res, next) => {
       return res.status(404).json({ erro: 'Chip nao encontrado' });
     }
 
-    const status = await evolutionApi.verificarStatus(chip.instanciaEvolution);
+    let status;
+    if (chip.tipo === 'meta') {
+      status = await metaApi.verificarStatus(chip.metaPhoneNumberId, chip.metaAccessToken);
+    } else {
+      status = await evolutionApi.verificarStatus(chip.instanciaEvolution);
+    }
     res.json(status);
   } catch (err) {
     console.error('Erro ao verificar status:', err.response?.data || err.message);
@@ -232,12 +272,19 @@ router.post('/:id/webhook', async (req, res, next) => {
 // PUT /api/chips/:id - Atualizar chip
 router.put('/:id', async (req, res, next) => {
   try {
-    const { nome, numero, ativo } = req.body;
+    const { nome, numero, ativo, metaPhoneNumberId, metaAccessToken } = req.body;
+    const updateData = {};
+    if (nome !== undefined) updateData.nome = nome;
+    if (numero !== undefined) updateData.numero = numero;
+    if (ativo !== undefined) updateData.ativo = ativo;
+    if (metaPhoneNumberId !== undefined) updateData.metaPhoneNumberId = metaPhoneNumberId;
+    if (metaAccessToken !== undefined) updateData.metaAccessToken = metaAccessToken;
+
     const chip = await prisma.chip.update({
       where: { id: parseInt(req.params.id) },
-      data: { nome, numero, ativo },
+      data: updateData,
     });
-    res.json(chip);
+    res.json({ ...chip, metaAccessToken: undefined });
   } catch (err) {
     next(err);
   }
@@ -282,9 +329,9 @@ router.delete('/:id', async (req, res, next) => {
     // Deletar chip
     await prisma.chip.delete({ where: { id: chipId } });
 
-    // Tentar deletar instancia na Evolution API
+    // Tentar deletar instancia na Evolution API (não aplicável para chips Meta)
     try {
-      if (instancia) await evolutionApi.deletarInstancia(instancia);
+      if (instancia && chipParaDeletar.tipo !== 'meta') await evolutionApi.deletarInstancia(instancia);
     } catch {}
 
     res.json({ mensagem: 'Chip removido com sucesso' });

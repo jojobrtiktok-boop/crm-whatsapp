@@ -11,6 +11,9 @@ export default function Chips() {
   const [renomeando, setRenomeando] = useState(null); // { id, nome }
   const [criando, setCriando] = useState(false);
   const [nomeNovo, setNomeNovo] = useState('');
+  const [tipoNovo, setTipoNovo] = useState('evolution');
+  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState('');
+  const [metaAccessToken, setMetaAccessToken] = useState('');
   const [salvandoNovo, setSalvandoNovo] = useState(false);
   const [proxyStatus, setProxyStatus] = useState(null); // null | 'ok' | 'fail' | 'none'
 
@@ -52,18 +55,45 @@ export default function Chips() {
 
   async function criarChip() {
     if (!nomeNovo.trim()) return;
+    if (tipoNovo === 'meta' && (!metaPhoneNumberId.trim() || !metaAccessToken.trim())) {
+      alert('Phone Number ID e Access Token são obrigatórios para chips Meta');
+      return;
+    }
     setSalvandoNovo(true);
     try {
-      const res = await api.post('/chips', { nome: nomeNovo.trim() });
+      const payload = tipoNovo === 'meta'
+        ? { nome: nomeNovo.trim(), tipo: 'meta', metaPhoneNumberId: metaPhoneNumberId.trim(), metaAccessToken: metaAccessToken.trim() }
+        : { nome: nomeNovo.trim(), tipo: 'evolution' };
+
+      const res = await api.post('/chips', payload);
       setNomeNovo('');
+      setMetaPhoneNumberId('');
+      setMetaAccessToken('');
+      setTipoNovo('evolution');
       setCriando(false);
       carregarDados();
-      // Abrir modal de conexão automaticamente
-      abrirModalConexao(res.data.id, res.data.nome);
+      // Abrir modal de conexão apenas para chips Evolution
+      if (tipoNovo === 'evolution') {
+        abrirModalConexao(res.data.id, res.data.nome);
+      }
     } catch (err) {
       alert(err.response?.data?.erro || 'Erro ao criar chip');
     } finally {
       setSalvandoNovo(false);
+    }
+  }
+
+  async function verificarCredenciaisMeta(chipId) {
+    try {
+      const res = await api.get(`/chips/${chipId}/status`);
+      const state = res.data?.state;
+      if (state === 'open') {
+        alert('Credenciais Meta válidas — chip conectado.');
+      } else {
+        alert('Credenciais Meta inválidas ou expiradas. Edite o chip e atualize o Access Token.');
+      }
+    } catch {
+      alert('Erro ao verificar credenciais Meta.');
     }
   }
 
@@ -216,29 +246,72 @@ export default function Chips() {
 
       {/* Form inline de criacao */}
       {criando && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3">
+        <div className="bg-white rounded-xl border border-gray-200 p-4 flex flex-col gap-3">
+          {/* Toggle tipo */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setTipoNovo('evolution')}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${tipoNovo === 'evolution' ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Evolution (WPPConnect)
+            </button>
+            <button
+              onClick={() => setTipoNovo('meta')}
+              className={`flex-1 py-2 rounded-lg text-xs font-semibold transition-colors ${tipoNovo === 'meta' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+            >
+              Meta Oficial
+            </button>
+          </div>
+
+          {/* Nome */}
           <input
             type="text"
             value={nomeNovo}
             onChange={(e) => setNomeNovo(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && criarChip()}
+            onKeyDown={(e) => e.key === 'Enter' && tipoNovo === 'evolution' && criarChip()}
             autoFocus
-            className="flex-1 rounded-lg border-gray-300 text-sm"
+            className="rounded-lg border-gray-300 text-sm"
             placeholder="Nome do chip (ex: Vendas 01)"
           />
-          <button
-            onClick={criarChip}
-            disabled={salvandoNovo || !nomeNovo.trim()}
-            className="px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
-          >
-            {salvandoNovo ? 'Criando...' : 'Criar'}
-          </button>
-          <button
-            onClick={() => { setCriando(false); setNomeNovo(''); }}
-            className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
-          >
-            Cancelar
-          </button>
+
+          {/* Campos exclusivos Meta */}
+          {tipoNovo === 'meta' && (
+            <>
+              <input
+                type="text"
+                value={metaPhoneNumberId}
+                onChange={(e) => setMetaPhoneNumberId(e.target.value)}
+                className="rounded-lg border-gray-300 text-sm"
+                placeholder="Phone Number ID (ex: 123456789012345)"
+              />
+              <input
+                type="password"
+                value={metaAccessToken}
+                onChange={(e) => setMetaAccessToken(e.target.value)}
+                className="rounded-lg border-gray-300 text-sm"
+                placeholder="Access Token (Bearer token da Meta)"
+              />
+              <p className="text-xs text-gray-400">
+                Encontre em: Meta for Developers → seu App → WhatsApp → API Setup
+              </p>
+            </>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={criarChip}
+              disabled={salvandoNovo || !nomeNovo.trim()}
+              className="flex-1 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm hover:bg-primary-700 disabled:opacity-50"
+            >
+              {salvandoNovo ? 'Criando...' : 'Criar'}
+            </button>
+            <button
+              onClick={() => { setCriando(false); setNomeNovo(''); setTipoNovo('evolution'); setMetaPhoneNumberId(''); setMetaAccessToken(''); }}
+              className="px-3 py-2 bg-gray-100 text-gray-600 rounded-lg text-sm hover:bg-gray-200"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
@@ -286,9 +359,12 @@ export default function Chips() {
                         </button>
                       </div>
                     )}
-                    <div className="flex items-center gap-0.5">
+                    <div className="flex items-center gap-1">
                       {isConectado ? <Wifi size={10} className="text-green-500" /> : <WifiOff size={10} className="text-gray-400" />}
                       <span className={`text-[10px] ${getStatusColor(chip.statusConexao)}`}>{getStatusLabel(chip.statusConexao)}</span>
+                      {chip.tipo === 'meta' && (
+                        <span className="text-[8px] font-bold px-1 py-0.5 rounded bg-blue-100 text-blue-700 leading-none">META</span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -308,10 +384,13 @@ export default function Chips() {
                 {/* Botões */}
                 <div className="flex gap-1">
                   <button
-                    onClick={() => abrirModalConexao(chip.id, chip.nome)}
+                    onClick={() => chip.tipo === 'meta' ? verificarCredenciaisMeta(chip.id) : abrirModalConexao(chip.id, chip.nome)}
                     className={`flex-1 flex items-center justify-center gap-1 text-[11px] py-1.5 rounded-lg font-medium ${isConectado ? 'bg-gray-50 text-gray-500 hover:bg-gray-100' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}
                   >
-                    <QrCode size={11} /> {isConectado ? 'Recon.' : 'Conectar'}
+                    {chip.tipo === 'meta'
+                      ? <><ShieldCheck size={11} /> Verificar</>
+                      : <><QrCode size={11} /> {isConectado ? 'Recon.' : 'Conectar'}</>
+                    }
                   </button>
                   <button
                     onClick={() => verRelatorio(chip.id)}

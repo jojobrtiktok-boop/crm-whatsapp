@@ -1,6 +1,6 @@
 // Processador da fila de disparos agendados para grupos WhatsApp
 const { disparoQueue } = require('./setup');
-const { enviarTexto } = require('../services/evolutionApi');
+const { enviarTexto } = require('../services/whatsappDispatcher');
 const { emitir } = require('../services/socketManager');
 const { PrismaClient } = require('@prisma/client');
 

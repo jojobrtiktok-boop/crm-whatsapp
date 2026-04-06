@@ -35,4 +35,9 @@ module.exports = {
 
   // URL pública do servidor (usada para configurar webhooks)
   publicUrl: process.env.PUBLIC_URL || null,
+
+  // Meta Cloud API
+  meta: {
+    webhookVerifyToken: process.env.META_WEBHOOK_VERIFY_TOKEN || 'crm_meta_verify',
+  },
 };

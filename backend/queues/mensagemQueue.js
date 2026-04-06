@@ -1,7 +1,7 @@
 // Processador da fila de envio de mensagens
 const { mensagemQueue } = require('./setup');
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const { enviarTexto, enviarImagem, enviarAudio, enviarVideo, enviarDocumento } = require('../services/evolutionApi');
+const { enviarTexto, enviarImagem, enviarAudio, enviarVideo, enviarDocumento } = require('../services/whatsappDispatcher');
 const { PrismaClient } = require('@prisma/client');
 
 const prisma = new PrismaClient();
@@ -69,7 +69,7 @@ mensagemQueue.process(async (job) => {
 
   // Salvar wamid para rastrear recibos de leitura
   if (resultado && conversaId) {
-    const wamid = resultado?.key?.id || resultado?.id;
+    const wamid = resultado?.messages?.[0]?.id || resultado?.key?.id || resultado?.id;
     if (wamid) {
       await prisma.conversa.update({
         where: { id: conversaId },
@@ -79,7 +79,7 @@ mensagemQueue.process(async (job) => {
     // Emitir status atualizado
     const { emitir } = require('../services/socketManager');
     const conversaParaEmit = await prisma.conversa.findUnique({ where: { id: conversaId }, include: { chip: true } });
-    emitir('mensagem:status', { conversaId, status: 'enviado', wamid: resultado?.key?.id || resultado?.id }, conversaParaEmit?.chip?.contaId);
+    emitir('mensagem:status', { conversaId, status: 'enviado', wamid }, conversaParaEmit?.chip?.contaId);
   }
 });
 

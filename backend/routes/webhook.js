@@ -538,4 +538,169 @@ async function verificarEIniciarFunil(chip, cliente, conteudo) {
   }
 }
 
+// ─── META CLOUD API: Verificação de webhook (GET) ──────────────────────────
+// Deve ser acessível sem autenticação — Meta verifica antes de enviar eventos
+router.get('/meta', (req, res) => {
+  const VERIFY_TOKEN = config.meta?.webhookVerifyToken || 'crm_meta_verify';
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === VERIFY_TOKEN) {
+    console.log('[Webhook Meta] Verificação aprovada');
+    return res.status(200).send(challenge);
+  }
+  res.status(403).json({ erro: 'Verificação falhou' });
+});
+
+// ─── META CLOUD API: Recebe eventos (POST) ─────────────────────────────────
+router.post('/meta', async (req, res) => {
+  // Meta exige ACK rápido (< 20s), processamento é assíncrono
+  res.status(200).json({ recebido: true });
+
+  try {
+    const body = req.body;
+    if (body.object !== 'whatsapp_business_account') return;
+
+    for (const entry of (body.entry || [])) {
+      for (const change of (entry.changes || [])) {
+        const value = change.value;
+        if (!value) continue;
+
+        const phoneNumberId = value.metadata?.phone_number_id;
+        if (!phoneNumberId) continue;
+
+        // Encontrar chip pelo phone_number_id
+        const chip = await buscarChipPorInstancia(phoneNumberId);
+        if (!chip) {
+          console.log(`[Webhook Meta] Chip não encontrado para phone_number_id: ${phoneNumberId}`);
+          continue;
+        }
+
+        // Processar mensagens recebidas
+        if (value.messages?.length) {
+          for (const msg of value.messages) {
+            const contactInfo = value.contacts?.find(c => c.wa_id === msg.from);
+            await processarMensagemMeta(msg, contactInfo, chip);
+          }
+        }
+
+        // Processar status de entrega/leitura
+        if (value.statuses?.length) {
+          for (const status of value.statuses) {
+            await processarStatusMeta(status);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[Webhook Meta] Erro:', err.message);
+  }
+});
+
+// ─── META: Processa mensagem recebida ──────────────────────────────────────
+async function processarMensagemMeta(msg, contactInfo, chip) {
+  const telefone = msg.from;
+  if (!telefone || telefone.includes('status')) return;
+
+  // Verificar blacklist
+  const bloqueado = await prisma.blacklist.findFirst({ where: { telefone, contaId: chip.contaId } });
+  if (bloqueado) return;
+
+  const nome = contactInfo?.profile?.name || null;
+
+  // Upsert cliente
+  let isNovo = false;
+  let cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
+  if (!cliente) {
+    try {
+      cliente = await prisma.cliente.create({
+        data: { telefone, nome, chipOrigemId: chip.id, status: 'novo', contaId: chip.contaId },
+      });
+      isNovo = true;
+    } catch {
+      cliente = await prisma.cliente.findFirst({ where: { telefone, contaId: chip.contaId } });
+    }
+  } else if (nome && !cliente.nome) {
+    cliente = await prisma.cliente.update({ where: { id: cliente.id }, data: { nome } });
+  }
+  if (!cliente) return;
+
+  if (isNovo) emitir('lead:novo', { ...cliente, chipNome: chip.nome }, chip.contaId);
+
+  // Extrair conteúdo e tipo de mídia
+  let conteudo = '';
+  let tipoMidia = null;
+  let midiaUrl = null;
+  const wamid = msg.id;
+
+  const metaApi = require('../services/metaApi');
+  const uploadPath = require('../config').upload?.path || './uploads';
+  const destDir = path.join(path.resolve(__dirname, '..', '..', uploadPath.replace('./', '')), 'recebidos');
+
+  if (msg.type === 'text') {
+    conteudo = msg.text?.body || '';
+  } else if (msg.type === 'image') {
+    tipoMidia = 'imagem';
+    conteudo = msg.image?.caption || '';
+    midiaUrl = await metaApi.baixarMidia(msg.image?.id, chip.metaAccessToken, 'jpg', destDir, cliente.id);
+  } else if (msg.type === 'audio') {
+    tipoMidia = 'audio';
+    midiaUrl = await metaApi.baixarMidia(msg.audio?.id, chip.metaAccessToken, 'ogg', destDir, cliente.id);
+  } else if (msg.type === 'video') {
+    tipoMidia = 'video';
+    conteudo = msg.video?.caption || '';
+    midiaUrl = await metaApi.baixarMidia(msg.video?.id, chip.metaAccessToken, 'mp4', destDir, cliente.id);
+  } else if (msg.type === 'document') {
+    tipoMidia = 'documento';
+    conteudo = msg.document?.filename || '';
+    midiaUrl = await metaApi.baixarMidia(msg.document?.id, chip.metaAccessToken, 'pdf', destDir, cliente.id);
+  }
+
+  // Salvar conversa
+  const conversa = await prisma.conversa.create({
+    data: { clienteId: cliente.id, chipId: chip.id, tipo: 'recebida', conteudo, tipoMidia, midiaUrl, wamid },
+  });
+  await prisma.cliente.update({ where: { id: cliente.id }, data: { atualizadoEm: new Date() } }).catch(() => {});
+
+  emitir('mensagem:nova', { conversa, clienteId: cliente.id, chipId: chip.id }, chip.contaId);
+
+  // Marcar como lida automaticamente
+  try { await metaApi.marcarComoLido(chip.metaPhoneNumberId, chip.metaAccessToken, wamid); } catch {}
+
+  // Rastrear origem de anúncio
+  await salvarOrigemAd(cliente, conteudo, isNovo);
+
+  // Comprovante de pagamento (imagem)
+  if (tipoMidia === 'imagem' && midiaUrl) {
+    const absPath = path.join(path.resolve(__dirname, '..', '..', 'uploads'), midiaUrl.replace('/uploads/', ''));
+    await comprovanteQueue.add({ clienteId: cliente.id, chipId: chip.id, imagemPath: absPath, instanciaEvolution: chip.instanciaEvolution, telefoneCliente: cliente.telefone });
+  }
+
+  // Processar resposta no funil ativo
+  await processarRespostaFunil(cliente.id, conteudo, tipoMidia);
+  await verificarEIniciarFunil(chip, cliente, conteudo);
+}
+
+// ─── META: Processa status de entrega/leitura ──────────────────────────────
+async function processarStatusMeta(status) {
+  try {
+    const wamid = status.id;
+    const metaStatus = status.status;
+    let novoStatus = null;
+    if (metaStatus === 'delivered') novoStatus = 'entregue';
+    if (metaStatus === 'read') novoStatus = 'lido';
+    if (!novoStatus || !wamid) return;
+
+    const conversa = await prisma.conversa.findFirst({ where: { wamid } });
+    if (conversa) {
+      await prisma.conversa.update({ where: { id: conversa.id }, data: { status: novoStatus } });
+      const chipStatus = await prisma.chip.findUnique({ where: { id: conversa.chipId } });
+      emitir('mensagem:status', { conversaId: conversa.id, status: novoStatus, clienteId: conversa.clienteId }, chipStatus?.contaId);
+    }
+  } catch (err) {
+    console.error('[Webhook Meta] Erro ao processar status:', err.message);
+  }
+}
+
 module.exports = router;

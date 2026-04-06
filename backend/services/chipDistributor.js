@@ -21,10 +21,11 @@ async function obterProximoChip() {
 }
 
 // Busca chip pela instância da Evolution API (inclui inativos para receber mensagens)
+// Para chips Meta, faz fallback por metaPhoneNumberId
 async function buscarChipPorInstancia(instancia) {
-  return prisma.chip.findFirst({
-    where: { instanciaEvolution: instancia },
-  });
+  const chip = await prisma.chip.findFirst({ where: { instanciaEvolution: instancia } });
+  if (chip) return chip;
+  return prisma.chip.findFirst({ where: { metaPhoneNumberId: instancia } });
 }
 
 module.exports = { obterProximoChip, buscarChipPorInstancia };
