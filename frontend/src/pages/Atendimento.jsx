@@ -78,6 +78,7 @@ export default function Atendimento() {
   const [aba, setAba] = useState('todos'); // 'todos' | 'pagos'
   const [leads, setLeads] = useState([]);
   const [leadsPagos, setLeadsPagos] = useState([]);
+  const [filtroChip, setFiltroChip] = useState(null); // null = todos os chips
   const [selecionado, setSelecionado] = useState(null);
   const [vistaChat, setVistaChat] = useState(false); // mobile: alterna entre lista e chat
   const [conversas, setConversas] = useState([]);
@@ -255,8 +256,36 @@ export default function Atendimento() {
           </div>
         </div>
 
+        {/* Filtro por chip */}
+        {chips.length > 1 && (
+          <div className="px-3 py-2 border-b border-gray-100 flex gap-1.5 overflow-x-auto no-scrollbar">
+            <button
+              onClick={() => setFiltroChip(null)}
+              className={`shrink-0 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${
+                filtroChip === null ? 'bg-primary-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              Todos
+            </button>
+            {chips.map((chip) => (
+              <button
+                key={chip.id}
+                onClick={() => setFiltroChip(filtroChip === chip.id ? null : chip.id)}
+                className={`shrink-0 flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-semibold transition-colors ${
+                  filtroChip === chip.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                <Smartphone size={8} />
+                {chip.nome}
+              </button>
+            ))}
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto">
-          {(aba === 'todos' ? leads : leadsPagos).map((lead) => (
+          {(aba === 'todos' ? leads : leadsPagos)
+            .filter((lead) => filtroChip === null || lead.chipOrigemId === filtroChip || lead.chipOrigem?.id === filtroChip)
+            .map((lead) => (
             <div
               key={lead.id}
               onClick={() => selecionarLead(lead)}
@@ -319,10 +348,10 @@ export default function Atendimento() {
             </div>
           ))}
 
-          {(aba === 'todos' ? leads : leadsPagos).length === 0 && (
+          {(aba === 'todos' ? leads : leadsPagos).filter((lead) => filtroChip === null || lead.chipOrigemId === filtroChip || lead.chipOrigem?.id === filtroChip).length === 0 && (
             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
               <User size={32} className="mb-2 opacity-50" />
-              <p className="text-sm">{aba === 'pagos' ? 'Nenhum pagamento confirmado' : 'Nenhuma conversa ainda'}</p>
+              <p className="text-sm">{filtroChip ? 'Nenhuma conversa neste chip' : aba === 'pagos' ? 'Nenhum pagamento confirmado' : 'Nenhuma conversa ainda'}</p>
             </div>
           )}
         </div>
