@@ -1045,120 +1045,203 @@ function PainelEvento({ titulo, descricao, corBg, ativo, onToggle, children, msg
   );
 }
 
-function ConfigEventos() {
-  const [metaAtivo, setMetaAtivo] = useState(false);
-  const [metaPixelId, setMetaPixelId] = useState('');
-  const [metaToken, setMetaToken] = useState('');
-  const [metaSalvando, setMetaSalvando] = useState(false);
-  const [metaTestando, setMetaTestando] = useState(false);
-  const [metaMsg, setMetaMsg] = useState(null);
+function useEventoConfig(prefixMeta, prefixTiktok) {
+  const [meta, setMeta] = useState({ ativo: false, pixelId: '', token: '', lead: false, purchase: true, salvando: false, testando: false, msg: null });
+  const [tiktok, setTiktok] = useState({ ativo: false, pixelId: '', token: '', lead: false, purchase: true, salvando: false, testando: false, msg: null });
 
-  const [tiktokAtivo, setTiktokAtivo] = useState(false);
-  const [tiktokPixelId, setTiktokPixelId] = useState('');
-  const [tiktokToken, setTiktokToken] = useState('');
-  const [tiktokSalvando, setTiktokSalvando] = useState(false);
-  const [tiktokTestando, setTiktokTestando] = useState(false);
-  const [tiktokMsg, setTiktokMsg] = useState(null);
+  function setM(patch) { setMeta(p => ({ ...p, ...patch })); }
+  function setT(patch) { setTiktok(p => ({ ...p, ...patch })); }
 
-  useEffect(() => {
-    api.get('/configuracoes').then(r => {
-      const cfg = r.data;
-      setMetaAtivo(cfg.eventos_meta_ativo === 'true');
-      setMetaPixelId(cfg.eventos_meta_pixel_id || '');
-      setMetaToken(cfg.eventos_meta_token || '');
-      setTiktokAtivo(cfg.eventos_tiktok_ativo === 'true');
-      setTiktokPixelId(cfg.eventos_tiktok_pixel_id || '');
-      setTiktokToken(cfg.eventos_tiktok_token || '');
-    }).catch(console.error);
-  }, []);
+  function carregarDe(cfg) {
+    setM({
+      ativo: cfg[`${prefixMeta}ativo`] === 'true',
+      pixelId: cfg[`${prefixMeta}pixel_id`] || '',
+      token: cfg[`${prefixMeta}token`] || '',
+      lead: cfg[`${prefixMeta}lead`] === 'true',
+      purchase: cfg[`${prefixMeta}purchase`] !== 'false',
+    });
+    setT({
+      ativo: cfg[`${prefixTiktok}ativo`] === 'true',
+      pixelId: cfg[`${prefixTiktok}pixel_id`] || '',
+      token: cfg[`${prefixTiktok}token`] || '',
+      lead: cfg[`${prefixTiktok}lead`] === 'true',
+      purchase: cfg[`${prefixTiktok}purchase`] !== 'false',
+    });
+  }
 
   async function salvarMeta() {
-    setMetaSalvando(true); setMetaMsg(null);
+    setM({ salvando: true, msg: null });
     try {
-      await api.put('/configuracoes', { eventos_meta_ativo: String(metaAtivo), eventos_meta_pixel_id: metaPixelId, eventos_meta_token: metaToken });
-      setMetaMsg({ tipo: 'ok', texto: 'Salvo com sucesso!' });
-    } catch { setMetaMsg({ tipo: 'erro', texto: 'Erro ao salvar.' }); }
-    finally { setMetaSalvando(false); }
+      await api.put('/configuracoes', {
+        [`${prefixMeta}ativo`]: String(meta.ativo),
+        [`${prefixMeta}pixel_id`]: meta.pixelId,
+        [`${prefixMeta}token`]: meta.token,
+        [`${prefixMeta}lead`]: String(meta.lead),
+        [`${prefixMeta}purchase`]: String(meta.purchase),
+      });
+      setM({ msg: { tipo: 'ok', texto: 'Salvo!' } });
+    } catch { setM({ msg: { tipo: 'erro', texto: 'Erro ao salvar.' } }); }
+    finally { setM({ salvando: false }); }
   }
 
   async function testarMeta() {
-    if (!metaPixelId || !metaToken) { setMetaMsg({ tipo: 'erro', texto: 'Preencha Pixel ID e Token.' }); return; }
-    setMetaTestando(true); setMetaMsg(null);
+    if (!meta.pixelId || !meta.token) { setM({ msg: { tipo: 'erro', texto: 'Preencha Pixel ID e Token.' } }); return; }
+    setM({ testando: true, msg: null });
     try {
-      await api.post('/configuracoes/testar-meta', { pixelId: metaPixelId, token: metaToken });
-      setMetaMsg({ tipo: 'ok', texto: 'Evento enviado! Verifique no Events Manager.' });
-    } catch (err) { setMetaMsg({ tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' }); }
-    finally { setMetaTestando(false); }
+      await api.post('/configuracoes/testar-meta', { pixelId: meta.pixelId, token: meta.token });
+      setM({ msg: { tipo: 'ok', texto: 'Evento enviado! Verifique no Events Manager.' } });
+    } catch (err) { setM({ msg: { tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' } }); }
+    finally { setM({ testando: false }); }
   }
 
   async function salvarTikTok() {
-    setTiktokSalvando(true); setTiktokMsg(null);
+    setT({ salvando: true, msg: null });
     try {
-      await api.put('/configuracoes', { eventos_tiktok_ativo: String(tiktokAtivo), eventos_tiktok_pixel_id: tiktokPixelId, eventos_tiktok_token: tiktokToken });
-      setTiktokMsg({ tipo: 'ok', texto: 'Salvo com sucesso!' });
-    } catch { setTiktokMsg({ tipo: 'erro', texto: 'Erro ao salvar.' }); }
-    finally { setTiktokSalvando(false); }
+      await api.put('/configuracoes', {
+        [`${prefixTiktok}ativo`]: String(tiktok.ativo),
+        [`${prefixTiktok}pixel_id`]: tiktok.pixelId,
+        [`${prefixTiktok}token`]: tiktok.token,
+        [`${prefixTiktok}lead`]: String(tiktok.lead),
+        [`${prefixTiktok}purchase`]: String(tiktok.purchase),
+      });
+      setT({ msg: { tipo: 'ok', texto: 'Salvo!' } });
+    } catch { setT({ msg: { tipo: 'erro', texto: 'Erro ao salvar.' } }); }
+    finally { setT({ salvando: false }); }
   }
 
   async function testarTikTok() {
-    if (!tiktokPixelId || !tiktokToken) { setTiktokMsg({ tipo: 'erro', texto: 'Preencha Pixel Code e Access Token.' }); return; }
-    setTiktokTestando(true); setTiktokMsg(null);
+    if (!tiktok.pixelId || !tiktok.token) { setT({ msg: { tipo: 'erro', texto: 'Preencha Pixel Code e Token.' } }); return; }
+    setT({ testando: true, msg: null });
     try {
-      await api.post('/configuracoes/testar-tiktok', { pixelId: tiktokPixelId, token: tiktokToken });
-      setTiktokMsg({ tipo: 'ok', texto: 'Evento enviado! Verifique no TikTok Events Manager.' });
-    } catch (err) { setTiktokMsg({ tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' }); }
-    finally { setTiktokTestando(false); }
+      await api.post('/configuracoes/testar-tiktok', { pixelId: tiktok.pixelId, token: tiktok.token });
+      setT({ msg: { tipo: 'ok', texto: 'Evento enviado! Verifique no TikTok Events Manager.' } });
+    } catch (err) { setT({ msg: { tipo: 'erro', texto: err.response?.data?.erro || 'Erro ao testar.' } }); }
+    finally { setT({ testando: false }); }
   }
 
+  return { meta, setM, tiktok, setT, carregarDe, salvarMeta, testarMeta, salvarTikTok, testarTikTok };
+}
+
+function ColunaEventos({ titulo, badge, badgeCor, meta, setM, tiktok, setT, salvarMeta, testarMeta, salvarTikTok, testarTikTok, dicaMeta, dicaTiktok }) {
   return (
-    <div className="space-y-6 max-w-xl">
+    <div className="flex-1 min-w-0 space-y-4">
+      <div className="flex items-center gap-2 pb-2 border-b border-gray-200">
+        <h3 className="font-semibold text-gray-800 text-sm">{titulo}</h3>
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full text-white ${badgeCor}`}>{badge}</span>
+      </div>
+
+      {/* Meta CAPI */}
       <PainelEvento
         titulo="Meta Conversions API"
-        descricao="Dispara evento Purchase quando PIX for confirmado"
+        descricao="Eventos server-side para o Meta Ads"
         corBg="bg-blue-500"
-        ativo={metaAtivo} onToggle={setMetaAtivo}
-        msg={metaMsg}
-        onTestar={testarMeta} testando={metaTestando}
-        onSalvar={salvarMeta} salvando={metaSalvando}
-        dica="Events Manager → seu Pixel → Configurações → API de Conversões → Gerar token de acesso"
+        ativo={meta.ativo} onToggle={v => setM({ ativo: v })}
+        msg={meta.msg}
+        onTestar={testarMeta} testando={meta.testando}
+        onSalvar={salvarMeta} salvando={meta.salvando}
+        dica={dicaMeta}
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pixel ID</label>
-            <input type="text" value={metaPixelId} onChange={e => setMetaPixelId(e.target.value)}
+            <label className="block text-xs font-medium text-gray-700 mb-1">Pixel ID</label>
+            <input type="text" value={meta.pixelId} onChange={e => setM({ pixelId: e.target.value })}
               placeholder="Ex: 1234567890123456" className="w-full rounded-lg border-gray-300 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
-            <input type="password" value={metaToken} onChange={e => setMetaToken(e.target.value)}
-              placeholder="Token gerado no Events Manager" className="w-full rounded-lg border-gray-300 text-sm" />
+            <label className="block text-xs font-medium text-gray-700 mb-1">Access Token</label>
+            <input type="password" value={meta.token} onChange={e => setM({ token: e.target.value })}
+              placeholder="Token do Events Manager" className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div className="flex gap-4 pt-1">
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={meta.lead} onChange={e => setM({ lead: e.target.checked })} className="rounded" />
+              Lead (novo contato)
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={meta.purchase} onChange={e => setM({ purchase: e.target.checked })} className="rounded" />
+              Purchase (PIX)
+            </label>
           </div>
         </div>
       </PainelEvento>
 
+      {/* TikTok */}
       <PainelEvento
         titulo="TikTok Events API"
-        descricao="Dispara evento PlaceAnOrder quando PIX for confirmado"
+        descricao="Eventos server-side para o TikTok Ads"
         corBg="bg-black"
-        ativo={tiktokAtivo} onToggle={setTiktokAtivo}
-        msg={tiktokMsg}
-        onTestar={testarTikTok} testando={tiktokTestando}
-        onSalvar={salvarTikTok} salvando={tiktokSalvando}
-        dica="TikTok Ads → Assets → Events → Web Events → API de Eventos → Gerar Access Token"
+        ativo={tiktok.ativo} onToggle={v => setT({ ativo: v })}
+        msg={tiktok.msg}
+        onTestar={testarTikTok} testando={tiktok.testando}
+        onSalvar={salvarTikTok} salvando={tiktok.salvando}
+        dica={dicaTiktok}
       >
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Pixel Code</label>
-            <input type="text" value={tiktokPixelId} onChange={e => setTiktokPixelId(e.target.value)}
+            <label className="block text-xs font-medium text-gray-700 mb-1">Pixel Code</label>
+            <input type="text" value={tiktok.pixelId} onChange={e => setT({ pixelId: e.target.value })}
               placeholder="Ex: CXXXXXXXXXXXXXXX" className="w-full rounded-lg border-gray-300 text-sm" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Access Token</label>
-            <input type="password" value={tiktokToken} onChange={e => setTiktokToken(e.target.value)}
-              placeholder="Token gerado no TikTok Events Manager" className="w-full rounded-lg border-gray-300 text-sm" />
+            <label className="block text-xs font-medium text-gray-700 mb-1">Access Token</label>
+            <input type="password" value={tiktok.token} onChange={e => setT({ token: e.target.value })}
+              placeholder="Token do TikTok Events Manager" className="w-full rounded-lg border-gray-300 text-sm" />
+          </div>
+          <div className="flex gap-4 pt-1">
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={tiktok.lead} onChange={e => setT({ lead: e.target.checked })} className="rounded" />
+              Lead (novo contato)
+            </label>
+            <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+              <input type="checkbox" checked={tiktok.purchase} onChange={e => setT({ purchase: e.target.checked })} className="rounded" />
+              Purchase (PIX)
+            </label>
           </div>
         </div>
       </PainelEvento>
+    </div>
+  );
+}
+
+function ConfigEventos() {
+  const normal = useEventoConfig('eventos_meta_', 'eventos_tiktok_');
+  const oficial = useEventoConfig('eventos_meta_oficial_', 'eventos_tiktok_oficial_');
+
+  useEffect(() => {
+    api.get('/configuracoes').then(r => {
+      normal.carregarDe(r.data);
+      oficial.carregarDe(r.data);
+    }).catch(console.error);
+  }, []);
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-gray-500">Configure pixels separados para chips <strong>Evolution</strong> (WPPConnect) e chips <strong>Meta Oficial</strong> (Cloud API).</p>
+      <div className="flex flex-col lg:flex-row gap-6">
+        <ColunaEventos
+          titulo="Chip Normal"
+          badge="Evolution"
+          badgeCor="bg-primary-600"
+          meta={normal.meta} setM={normal.setM}
+          tiktok={normal.tiktok} setT={normal.setT}
+          salvarMeta={normal.salvarMeta} testarMeta={normal.testarMeta}
+          salvarTikTok={normal.salvarTikTok} testarTikTok={normal.testarTikTok}
+          dicaMeta="Events Manager → seu Pixel → Configurações → API de Conversões → Gerar token"
+          dicaTiktok="TikTok Ads → Assets → Events → Web Events → API de Eventos → Gerar Access Token"
+        />
+        <div className="hidden lg:block w-px bg-gray-200 self-stretch" />
+        <ColunaEventos
+          titulo="Eventos Oficial"
+          badge="Meta Cloud API"
+          badgeCor="bg-blue-600"
+          meta={oficial.meta} setM={oficial.setM}
+          tiktok={oficial.tiktok} setT={oficial.setT}
+          salvarMeta={oficial.salvarMeta} testarMeta={oficial.testarMeta}
+          salvarTikTok={oficial.salvarTikTok} testarTikTok={oficial.testarTikTok}
+          dicaMeta="Mesmo Pixel ID da sua conta Meta Business, com token do app que usa a Cloud API"
+          dicaTiktok="Mesmo Pixel Code do TikTok, pode usar o mesmo token ou um separado"
+        />
+      </div>
     </div>
   );
 }

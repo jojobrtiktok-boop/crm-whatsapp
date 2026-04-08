@@ -137,6 +137,7 @@ async function processarMensagemWaha(payload, instancia) {
   if (isNovo) {
     console.log(`[Webhook] Novo lead: ${telefone} (${cliente.nome || 'sem nome'})`);
     emitir('lead:novo', cliente, chip.contaId);
+    require('../services/conversionEvents').onNovoLead({ chip, telefone, contaId: chip.contaId }).catch(() => {});
   }
 
   // Extrair conteúdo
@@ -285,7 +286,10 @@ async function processarMensagem(evento, instancia) {
     });
   }
   if (!cliente) return;
-  if (isNovo2) emitir('lead:novo', cliente, chip.contaId);
+  if (isNovo2) {
+    emitir('lead:novo', cliente, chip.contaId);
+    require('../services/conversionEvents').onNovoLead({ chip, telefone, contaId: chip.contaId }).catch(() => {});
+  }
 
   const msgData = mensagem.message || {};
   let conteudo = msgData.conversation
@@ -401,7 +405,10 @@ async function processarMensagemWPP(data, instancia) {
   }
   if (!cliente) { console.log(`[Webhook] Cliente não encontrado/criado para ${telefone} conta:${chip.contaId}`); return; }
   console.log(`[Webhook] Cliente id:${cliente.id} telefone:${telefone} conta:${chip.contaId} novo:${isNovo}`);
-  if (isNovo) emitir('lead:novo', cliente, chip.contaId);
+  if (isNovo) {
+    emitir('lead:novo', cliente, chip.contaId);
+    require('../services/conversionEvents').onNovoLead({ chip, telefone, contaId: chip.contaId }).catch(() => {});
+  }
 
   // Extrair conteúdo e tipo de mídia
   let conteudo = data.body || data.caption || '';
@@ -626,7 +633,10 @@ async function processarMensagemMeta(msg, contactInfo, chip) {
   }
   if (!cliente) return;
 
-  if (isNovo) emitir('lead:novo', { ...cliente, chipNome: chip.nome }, chip.contaId);
+  if (isNovo) {
+    emitir('lead:novo', { ...cliente, chipNome: chip.nome }, chip.contaId);
+    require('../services/conversionEvents').onNovoLead({ chip, telefone, contaId: chip.contaId }).catch(() => {});
+  }
 
   // Extrair conteúdo e tipo de mídia
   let conteudo = '';

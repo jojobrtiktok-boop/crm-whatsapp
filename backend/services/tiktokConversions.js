@@ -7,25 +7,20 @@ function hashPhone(telefone) {
   return crypto.createHash('sha256').update(numero).digest('hex');
 }
 
-async function dispararPurchaseTikTok({ pixelId, accessToken, telefone, valor, moeda = 'BRL', eventId }) {
-  if (!pixelId || !accessToken || !telefone || !valor) {
+async function dispararEvento({ pixelId, accessToken, eventName, telefone, valor, moeda = 'BRL', eventId }) {
+  if (!pixelId || !accessToken || !telefone) {
     console.log('[TikTokConversions] Dados insuficientes, evento não disparado');
     return;
   }
 
   const payload = {
     pixel_code: pixelId,
-    event: 'PlaceAnOrder',
+    event: eventName,
     timestamp: new Date().toISOString(),
-    context: {
-      user: {
-        phone_number: hashPhone(telefone),
-      },
-    },
+    context: { user: { phone_number: hashPhone(telefone) } },
     properties: {
-      value: Number(valor),
-      currency: moeda,
-      order_id: eventId || `order_${Date.now()}`,
+      ...(valor ? { value: Number(valor), currency: moeda } : {}),
+      ...(eventId ? { order_id: eventId } : {}),
     },
   };
 
@@ -35,12 +30,20 @@ async function dispararPurchaseTikTok({ pixelId, accessToken, telefone, valor, m
       headers: { 'Access-Token': accessToken, 'Content-Type': 'application/json' },
       timeout: 8000,
     });
-    console.log(`[TikTokConversions] PlaceAnOrder disparado: R$${valor} para ${telefone} — code: ${res.data?.code}`);
+    console.log(`[TikTokConversions] ${eventName} disparado para ${telefone} — code: ${res.data?.code}`);
     return res.data;
   } catch (err) {
     const msg = err.response?.data?.message || err.message;
-    console.error('[TikTokConversions] Erro ao disparar evento:', msg);
+    console.error(`[TikTokConversions] Erro ao disparar ${eventName}:`, msg);
   }
 }
 
-module.exports = { dispararPurchaseTikTok };
+async function dispararPurchaseTikTok({ pixelId, accessToken, telefone, valor, moeda = 'BRL', eventId }) {
+  return dispararEvento({ pixelId, accessToken, eventName: 'PlaceAnOrder', telefone, valor, moeda, eventId });
+}
+
+async function dispararLeadTikTok({ pixelId, accessToken, telefone, eventId }) {
+  return dispararEvento({ pixelId, accessToken, eventName: 'SubmitForm', telefone, eventId });
+}
+
+module.exports = { dispararPurchaseTikTok, dispararLeadTikTok, dispararEvento };

@@ -163,42 +163,13 @@ async function processarComprovante({ clienteId, chipId, imagemPath, instanciaEv
       const paisCliente = detectarPaisDeTelefone(telefoneCliente);
       const valorStr = dados.valor ? formatarMoedaLocal(dados.valor, paisCliente) : 'N/A';
 
-      // Meta Conversions API
+      // Conversions API (Meta + TikTok) — roteia por tipo do chip automaticamente
       try {
-        const cfgMeta = await prisma.configuracao.findMany({
-          where: { chave: { in: ['eventos_meta_ativo', 'eventos_meta_pixel_id', 'eventos_meta_token'] }, contaId },
-        }).catch(() => []);
-        const metaMap = Object.fromEntries(cfgMeta.map(c => [c.chave, c.valor]));
-        if (metaMap.eventos_meta_ativo === 'true' && metaMap.eventos_meta_pixel_id && metaMap.eventos_meta_token && dados.valor) {
-          const { dispararPurchaseMeta } = require('./metaConversions');
-          await dispararPurchaseMeta({
-            pixelId: metaMap.eventos_meta_pixel_id,
-            accessToken: metaMap.eventos_meta_token,
-            telefone: telefoneCliente,
-            valor: dados.valor,
-          });
-        }
-      } catch (errMeta) {
-        console.error('[Comprovante] Erro Meta Conversions:', errMeta.message);
-      }
-
-      // TikTok Events API
-      try {
-        const cfgTiktok = await prisma.configuracao.findMany({
-          where: { chave: { in: ['eventos_tiktok_ativo', 'eventos_tiktok_pixel_id', 'eventos_tiktok_token'] }, contaId },
-        }).catch(() => []);
-        const tiktokMap = Object.fromEntries(cfgTiktok.map(c => [c.chave, c.valor]));
-        if (tiktokMap.eventos_tiktok_ativo === 'true' && tiktokMap.eventos_tiktok_pixel_id && tiktokMap.eventos_tiktok_token && dados.valor) {
-          const { dispararPurchaseTikTok } = require('./tiktokConversions');
-          await dispararPurchaseTikTok({
-            pixelId: tiktokMap.eventos_tiktok_pixel_id,
-            accessToken: tiktokMap.eventos_tiktok_token,
-            telefone: telefoneCliente,
-            valor: dados.valor,
-          });
-        }
-      } catch (errTiktok) {
-        console.error('[Comprovante] Erro TikTok Conversions:', errTiktok.message);
+        const paisCliente2 = detectarPaisDeTelefone(telefoneCliente);
+        const moeda = PAISES?.find?.(p => p.codigo === paisCliente2)?.moeda || 'BRL';
+        await require('./conversionEvents').onPurchase({ chip, telefone: telefoneCliente, valor: dados.valor, moeda, contaId });
+      } catch (errConv) {
+        console.error('[Comprovante] Erro Conversion Events:', errConv.message);
       }
 
       // Push notification
