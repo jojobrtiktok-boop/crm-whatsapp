@@ -39,6 +39,25 @@ mensagemQueue.process(async (job) => {
     return;
   }
 
+  // ── Trava de envio único ──────────────────────────────────────────────────
+  // O job.id é o MESMO em todas as tentativas (retry do Bull e reprocessamento
+  // de job "stalled" após crash/restart do worker). Sem esta trava, qualquer
+  // falha DEPOIS do envio (ex: salvar wamid no banco) fazia o Bull reprocessar
+  // o job e REENVIAR a mensagem — em crash-loop isso virava 20+ mensagens
+  // iguais pro cliente. Marca "enviando" no Redis ANTES de enviar (NX = só a
+  // primeira tentativa consegue); tentativas seguintes pulam o envio.
+  const chaveEnvio = `msg_enviada:${job.id}`;
+  try {
+    const primeira = await mensagemQueue.client.set(chaveEnvio, '1', 'EX', 21600, 'NX');
+    if (primeira === null) {
+      console.warn(`[MensagemQueue] Job ${job.id} já teve tentativa de envio — não reenvia (anti-spam)`);
+      return;
+    }
+  } catch (e) {
+    // Redis indisponível: segue e envia (perder a trava é melhor que perder a mensagem)
+    console.warn(`[MensagemQueue] trava de envio indisponível: ${e.message}`);
+  }
+
   // WAHA NOWEB suporta @lid nativamente - não ignorar mais
   console.log(`[MensagemQueue] Enviando ${tipo} para ${telefone} via ${instancia}`);
 
@@ -67,19 +86,25 @@ mensagemQueue.process(async (job) => {
   // Delay de 2 segundos entre mensagens para não parecer robô
   if (resultado) await sleep(2000);
 
-  // Salvar wamid para rastrear recibos de leitura
+  // Salvar wamid para rastrear recibos de leitura.
+  // BLINDADO: a mensagem JÁ FOI enviada — se o banco/socket falhar aqui, o job
+  // NÃO pode falhar (falha = retry do Bull = mensagem duplicada pro cliente).
   if (resultado && conversaId) {
-    const wamid = resultado?.messages?.[0]?.id || resultado?.key?.id || resultado?.id;
-    if (wamid) {
-      await prisma.conversa.update({
-        where: { id: conversaId },
-        data: { wamid },
-      });
+    try {
+      const wamid = resultado?.messages?.[0]?.id || resultado?.key?.id || resultado?.id;
+      if (wamid) {
+        await prisma.conversa.update({
+          where: { id: conversaId },
+          data: { wamid },
+        });
+      }
+      // Emitir status atualizado
+      const { emitir } = require('../services/socketManager');
+      const conversaParaEmit = await prisma.conversa.findUnique({ where: { id: conversaId }, include: { chip: true } });
+      emitir('mensagem:status', { conversaId, status: 'enviado', wamid }, conversaParaEmit?.chip?.contaId);
+    } catch (e) {
+      console.error(`[MensagemQueue] pós-envio falhou (mensagem foi entregue, ignorando): ${e.message}`);
     }
-    // Emitir status atualizado
-    const { emitir } = require('../services/socketManager');
-    const conversaParaEmit = await prisma.conversa.findUnique({ where: { id: conversaId }, include: { chip: true } });
-    emitir('mensagem:status', { conversaId, status: 'enviado', wamid }, conversaParaEmit?.chip?.contaId);
   }
 });
 
